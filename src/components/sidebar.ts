@@ -1,4 +1,4 @@
-// Sidebar Component - Navigation with Glassmorphism
+// Sidebar Component - Navigation with Dark Theme
 export class Sidebar {
   private currentPanel: string = 'dashboard';
   private menuItems: NodeListOf<Element> | null = null;
@@ -8,7 +8,7 @@ export class Sidebar {
   }
 
   private init(): void {
-    this.menuItems = document.querySelectorAll('.sidebar-menu-item');
+    this.menuItems = document.querySelectorAll('.nav-icon[data-panel]');
     this.setupMenuItems();
     this.showPanel('dashboard');
   }
@@ -34,7 +34,7 @@ export class Sidebar {
     });
 
     // Add active class to clicked item
-    const activeItem = document.querySelector(`[data-panel="${panelId}"]`);
+    const activeItem = document.querySelector(`.nav-icon[data-panel="${panelId}"]`);
     activeItem?.classList.add('active');
 
     // Show the selected panel with animation
