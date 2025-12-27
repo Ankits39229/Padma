@@ -99,6 +99,151 @@
   width: 100%;
 }
 
+/* Boost Mode Selector */
+.boost-mode-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.boost-mode-option {
+  cursor: pointer;
+}
+
+.boost-mode-option input {
+  display: none;
+}
+
+.boost-mode-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.03);
+  border: 2px solid transparent;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.boost-mode-option input:checked + .boost-mode-card {
+  background: rgba(74, 144, 226, 0.1);
+  border-color: var(--accent-primary);
+}
+
+.boost-mode-card:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.mode-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mode-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.mode-icon.soft {
+  background: linear-gradient(135deg, #48bb78, #38a169);
+  color: white;
+}
+
+.mode-icon.hard {
+  background: linear-gradient(135deg, #ed8936, #dd6b20);
+  color: white;
+}
+
+.mode-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mode-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.mode-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Boost Result Display */
+.boost-result {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(72, 187, 120, 0.1);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.boost-result .result-icon {
+  width: 32px;
+  height: 32px;
+  background: var(--accent-success);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+.boost-result .result-text {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.boost-result .result-amount {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--accent-success);
+}
+
+.boost-result .result-label {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* Cooldown Display */
+.cooldown-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  background: rgba(237, 137, 54, 0.1);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  color: var(--accent-warning);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.cooldown-display svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Boost Info Text */
+.boost-info {
+  text-align: center;
+  margin-top: 12px;
+  color: var(--text-muted);
+}
+
 /* Battery Card */
 .no-battery {
   display: flex;

@@ -53,6 +53,23 @@ interface CleanResult {
   };
 }
 
+interface BoostResult {
+  success: boolean;
+  freedMemory?: number;
+  memoryBefore?: number;
+  memoryAfter?: number;
+  currentFree?: number;
+  currentUsed?: number;
+  mode?: 'soft' | 'hard';
+  error?: string;
+  cooldownRemaining?: number;
+}
+
+interface CooldownStatus {
+  canBoost: boolean;
+  remainingSeconds: number;
+}
+
 interface StartupApp {
   Name: string;
   Command: string;
@@ -115,9 +132,15 @@ const electronAPI = {
   cleanJunk: (categories: string[]): Promise<CleanResult> => 
     ipcRenderer.invoke('clean-junk', categories),
   
-  // RAM Optimization
-  boostRam: (): Promise<{ success: boolean; freedMemory?: number; currentFree?: number; currentUsed?: number; error?: string }> => 
+  // RAM Optimization (Prana)
+  boostRam: (): Promise<BoostResult> => 
     ipcRenderer.invoke('boost-ram'),
+  boostRamSoft: (): Promise<BoostResult> => 
+    ipcRenderer.invoke('boost-ram-soft'),
+  boostRamHard: (): Promise<BoostResult> => 
+    ipcRenderer.invoke('boost-ram-hard'),
+  getBoostCooldown: (): Promise<CooldownStatus> => 
+    ipcRenderer.invoke('get-boost-cooldown'),
   
   // Startup Apps
   getStartupApps: (): Promise<StartupApp[]> => 

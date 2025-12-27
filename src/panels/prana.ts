@@ -3,11 +3,16 @@ import { BasePanel } from './BasePanel.js';
 import { Toast } from '../components/toast.js';
 import { StartupApp, PowerPlan, SystemInfo } from '../types/electron.d.js';
 
+type BoostMode = 'soft' | 'hard';
+
 export class PranaPanel extends BasePanel {
   private startupApps: StartupApp[] = [];
   private powerPlans: PowerPlan[] = [];
   private systemInfo: SystemInfo | null = null;
   private isBoostingRam: boolean = false;
+  private selectedBoostMode: BoostMode = 'soft';
+  private cooldownInterval: NodeJS.Timeout | null = null;
+  private cooldownRemaining: number = 0;
 
   constructor() {
     super('prana-panel', 30);
@@ -95,12 +100,72 @@ export class PranaPanel extends BasePanel {
                   </div>
                 </div>
               </div>
+              
+              <!-- Boost Mode Selection -->
+              <div class="boost-mode-selector">
+                <label class="boost-mode-option">
+                  <input type="radio" name="boost-mode" value="soft" checked>
+                  <div class="boost-mode-card">
+                    <div class="mode-icon soft">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2v4"/>
+                        <path d="M12 18v4"/>
+                        <path d="M4.93 4.93l2.83 2.83"/>
+                        <path d="M16.24 16.24l2.83 2.83"/>
+                        <path d="M2 12h4"/>
+                        <path d="M18 12h4"/>
+                      </svg>
+                    </div>
+                    <div class="mode-info">
+                      <span class="mode-name">Soft Boost</span>
+                      <span class="mode-desc">Safe • Trims working sets</span>
+                    </div>
+                  </div>
+                </label>
+                <label class="boost-mode-option">
+                  <input type="radio" name="boost-mode" value="hard">
+                  <div class="boost-mode-card">
+                    <div class="mode-icon hard">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                      </svg>
+                    </div>
+                    <div class="mode-info">
+                      <span class="mode-name">Hard Boost</span>
+                      <span class="mode-desc">Aggressive • Clears cache</span>
+                    </div>
+                  </div>
+                </label>
+              </div>
+
+              <!-- Boost Result Display -->
+              <div class="boost-result" id="boost-result" style="display: none;">
+                <div class="result-icon">✓</div>
+                <div class="result-text">
+                  <span class="result-amount" id="freed-amount">0 MB</span>
+                  <span class="result-label">freed</span>
+                </div>
+              </div>
+
+              <!-- Cooldown Display -->
+              <div class="cooldown-display" id="cooldown-display" style="display: none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M12 6v6l4 2"/>
+                </svg>
+                <span id="cooldown-text">Cooldown: 0s</span>
+              </div>
+
               <button class="btn-primary btn-glow boost-btn" id="boost-ram-btn">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
                 </svg>
                 <span>Boost Now</span>
               </button>
+              
+              <p class="boost-info">
+                <small>💡 Soft Boost is safe for everyday use. Hard Boost may cause brief lag.</small>
+              </p>
             </div>
           </div>
 
@@ -388,6 +453,16 @@ export class PranaPanel extends BasePanel {
     const boostBtn = this.getElement('#boost-ram-btn');
     boostBtn?.addEventListener('click', () => this.boostRam());
 
+    // Boost mode selection
+    const modeRadios = this.container?.querySelectorAll('input[name="boost-mode"]');
+    modeRadios?.forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        const target = e.target as HTMLInputElement;
+        this.selectedBoostMode = target.value as BoostMode;
+        console.log('[Prana] Boost mode changed to:', this.selectedBoostMode);
+      });
+    });
+
     // Refresh startup apps
     const refreshBtn = this.getElement('#refresh-startup-btn');
     refreshBtn?.addEventListener('click', () => this.loadData());
@@ -398,6 +473,9 @@ export class PranaPanel extends BasePanel {
       const target = e.target as HTMLInputElement;
       this.togglePowerSaver(target.checked);
     });
+
+    // Check cooldown on load
+    this.checkCooldown();
 
     // Power plan selection
     this.container?.addEventListener('click', async (e) => {
@@ -424,11 +502,58 @@ export class PranaPanel extends BasePanel {
     });
   }
 
+  private async checkCooldown(): Promise<void> {
+    try {
+      const result = await window.electron.getBoostCooldown();
+      if (!result.canBoost && result.remainingSeconds > 0) {
+        this.startCooldownTimer(result.remainingSeconds);
+      }
+    } catch (error) {
+      console.log('[Prana] Cooldown check failed, boost available');
+    }
+  }
+
+  private startCooldownTimer(seconds: number): void {
+    this.cooldownRemaining = seconds;
+    const btn = this.getElement<HTMLButtonElement>('#boost-ram-btn');
+    const cooldownDisplay = this.getElement('#cooldown-display');
+    const cooldownText = this.getElement('#cooldown-text');
+
+    if (btn) btn.disabled = true;
+    if (cooldownDisplay) cooldownDisplay.style.display = 'flex';
+
+    if (this.cooldownInterval) {
+      clearInterval(this.cooldownInterval);
+    }
+
+    this.cooldownInterval = setInterval(() => {
+      this.cooldownRemaining--;
+      
+      if (cooldownText) {
+        const mins = Math.floor(this.cooldownRemaining / 60);
+        const secs = this.cooldownRemaining % 60;
+        cooldownText.textContent = mins > 0 
+          ? `Cooldown: ${mins}m ${secs}s` 
+          : `Cooldown: ${secs}s`;
+      }
+
+      if (this.cooldownRemaining <= 0) {
+        if (this.cooldownInterval) {
+          clearInterval(this.cooldownInterval);
+          this.cooldownInterval = null;
+        }
+        if (btn) btn.disabled = false;
+        if (cooldownDisplay) cooldownDisplay.style.display = 'none';
+      }
+    }, 1000);
+  }
+
   private async boostRam(): Promise<void> {
     if (this.isBoostingRam) return;
 
     this.isBoostingRam = true;
     const btn = this.getElement<HTMLButtonElement>('#boost-ram-btn');
+    const boostResult = this.getElement('#boost-result');
     
     if (btn) {
       btn.disabled = true;
@@ -437,33 +562,83 @@ export class PranaPanel extends BasePanel {
           <circle cx="12" cy="12" r="10"/>
           <path d="M12 6v6l4 2"/>
         </svg>
-        <span>Boosting...</span>
+        <span>${this.selectedBoostMode === 'hard' ? 'Deep Cleaning...' : 'Boosting...'}</span>
       `;
     }
 
+    // Hide previous result
+    if (boostResult) boostResult.style.display = 'none';
+
     try {
-      const result = await window.electron.boostRam();
+      let result;
+      
+      if (this.selectedBoostMode === 'hard') {
+        result = await window.electron.boostRamHard();
+      } else {
+        result = await window.electron.boostRamSoft();
+      }
       
       if (result.success) {
-        Toast.success('RAM boost complete!');
+        const freedMB = result.freedMemory ? (result.freedMemory / (1024 * 1024)).toFixed(1) : '0';
+        const processCount = result.processesAffected?.length || 0;
+        // Show up to 12 unique process names
+        const uniqueProcesses = [...new Set(result.processesAffected || [])];
+        const displayList = uniqueProcesses.slice(0, 12);
+        const moreCount = Math.max(0, uniqueProcesses.length - 12);
+        
+        // Show result with process info
+        if (boostResult) {
+          boostResult.style.display = 'flex';
+          const freedAmountEl = this.getElement('#freed-amount');
+          if (freedAmountEl) {
+            const boostTypeLabel = result.mode === 'hard' && result.hardBoostApplied ? ' + Cache Cleared' : '';
+            freedAmountEl.innerHTML = `
+              <span style="font-size: 1.2em; font-weight: 600;">${freedMB} MB</span> freed<br>
+              <small style="font-size: 0.65em; opacity: 0.85; display: block; margin-top: 6px; line-height: 1.4;">
+                <strong>✓ ${uniqueProcesses.length} apps optimized${boostTypeLabel}</strong><br>
+                <span style="color: #8b9dc3;">${displayList.join(' • ')}${moreCount > 0 ? ` (+${moreCount} more)` : ''}</span>
+              </small>
+              <small style="font-size: 0.55em; opacity: 0.6; display: block; margin-top: 4px;">ℹ Processes still running, memory trimmed</small>
+            `;
+          }
+        }
+
+        const modeText = this.selectedBoostMode === 'hard' ? 'Deep boost' : 'Boost';
+        Toast.success(`${modeText} complete! Freed ${freedMB} MB from ${uniqueProcesses.length} apps`);
+        
         // Refresh system info
         this.systemInfo = await window.electron.getSystemInfo();
         this.updateRamStats();
+        
+        // Start cooldown timer (5 minutes)
+        this.startCooldownTimer(300);
       } else {
-        Toast.error('Failed to boost RAM');
+        if (result.cooldownRemaining) {
+          Toast.warning(`Please wait ${result.cooldownRemaining}s before boosting again`);
+          this.startCooldownTimer(result.cooldownRemaining);
+        } else {
+          Toast.error(result.error || 'Failed to boost RAM');
+        }
       }
     } catch (error) {
       Toast.error('Error during RAM boost');
       this.handleError(error);
     } finally {
       this.isBoostingRam = false;
-      if (btn) {
-        btn.disabled = false;
+      if (btn && !btn.disabled) {
         btn.innerHTML = `
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
           </svg>
           <span>Boost Now</span>
+        `;
+      } else if (btn) {
+        btn.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 6v6l4 2"/>
+          </svg>
+          <span>On Cooldown</span>
         `;
       }
     }

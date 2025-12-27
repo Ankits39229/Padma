@@ -11,8 +11,11 @@ export interface ElectronAPI {
   scanJunk: (categories: string[]) => Promise<JunkScanResult>;
   cleanJunk: (categories: string[]) => Promise<CleanResult>;
   
-  // RAM Optimization
-  boostRam: () => Promise<{ success: boolean; freedMemory?: number; currentFree?: number; currentUsed?: number; error?: string }>;
+  // RAM Optimization (Prana)
+  boostRam: () => Promise<BoostResult>;
+  boostRamSoft: () => Promise<BoostResult>;
+  boostRamHard: () => Promise<BoostResult>;
+  getBoostCooldown: () => Promise<CooldownStatus>;
   
   // Startup Apps
   getStartupApps: () => Promise<StartupApp[]>;
@@ -33,6 +36,25 @@ export interface ElectronAPI {
   
   // Event Listeners
   onQuickCleanse: (callback: () => void) => void;
+}
+
+export interface BoostResult {
+  success: boolean;
+  freedMemory?: number;
+  memoryBefore?: number;
+  memoryAfter?: number;
+  currentFree?: number;
+  currentUsed?: number;
+  mode?: 'soft' | 'hard';
+  error?: string;
+  cooldownRemaining?: number;
+  processesAffected?: string[];
+  hardBoostApplied?: boolean;
+}
+
+export interface CooldownStatus {
+  canBoost: boolean;
+  remainingSeconds: number;
 }
 
 export interface SystemInfo {

@@ -624,24 +624,393 @@ async function deleteFilesInDirectory(dirPath: string): Promise<number> {
 // IPC HANDLERS - RAM Optimization
 // ============================================================================
 
+// ============================================================================
+// IPC HANDLERS - RAM Optimization (Prana)
+// ============================================================================
+
+// System critical processes that should never be touched
+const SYSTEM_CRITICAL_PROCESSES = [
+  'system', 'registry', 'smss.exe', 'csrss.exe', 'wininit.exe', 
+  'services.exe', 'lsass.exe', 'winlogon.exe', 'svchost.exe',
+  'dwm.exe', 'explorer.exe', 'ntoskrnl.exe', 'audiodg.exe'
+];
+
+// Cooldown tracking
+let lastBoostTime = 0;
+const BOOST_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Soft Boost - Trim working sets of all non-system processes
+ * Safe operation that tells apps to release unused RAM
+ */
+ipcMain.handle('boost-ram-soft', async () => {
+  try {
+    // Check cooldown
+    const now = Date.now();
+    const timeSinceLastBoost = now - lastBoostTime;
+    if (lastBoostTime > 0 && timeSinceLastBoost < BOOST_COOLDOWN_MS) {
+      const remainingSeconds = Math.ceil((BOOST_COOLDOWN_MS - timeSinceLastBoost) / 1000);
+      return { 
+        success: false, 
+        error: `Please wait ${remainingSeconds} seconds before boosting again`,
+        cooldownRemaining: remainingSeconds
+      };
+    }
+
+    const si = require('systeminformation');
+    const memBefore = await si.mem();
+
+    // Create a temporary PowerShell script file to avoid command line escaping issues
+    const tempScriptPath = path.join(os.tmpdir(), `padma-boost-${Date.now()}.ps1`);
+    
+    const softBoostScript = `
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public class MemoryManager {
+  [DllImport("psapi.dll")]
+  public static extern bool EmptyWorkingSet(IntPtr hProcess);
+  
+  [DllImport("kernel32.dll")]
+  public static extern IntPtr OpenProcess(int dwDesiredAccess, bool bInheritHandle, int dwProcessId);
+  
+  [DllImport("kernel32.dll")]
+  public static extern bool CloseHandle(IntPtr hObject);
+  
+  [DllImport("user32.dll")]
+  public static extern IntPtr GetForegroundWindow();
+  
+  [DllImport("user32.dll")]
+  public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out int lpdwProcessId);
+}
+'@
+
+# Get foreground window process ID to skip it
+$foregroundHwnd = [MemoryManager]::GetForegroundWindow()
+$foregroundPid = 0
+[MemoryManager]::GetWindowThreadProcessId($foregroundHwnd, [ref]$foregroundPid) | Out-Null
+
+# System critical processes to skip
+$criticalProcesses = @('system', 'registry', 'smss', 'csrss', 'wininit', 'services', 'lsass', 'winlogon', 'svchost', 'dwm', 'ntoskrnl', 'audiodg', 'electron')
+
+$freedCount = 0
+$skippedCount = 0
+
+Get-Process | ForEach-Object {
+  $proc = $_
+  $procName = $proc.ProcessName.ToLower()
+  
+  # Skip system critical processes
+  if ($criticalProcesses -contains $procName) {
+    $skippedCount++
+    return
+  }
+  
+  # Skip foreground process
+  if ($proc.Id -eq $foregroundPid) {
+    $skippedCount++
+    return
+  }
+  
+  # Skip our own process
+  if ($proc.Id -eq $PID) {
+    $skippedCount++
+    return
+  }
+
+  try {
+    # PROCESS_SET_QUOTA (0x0100) | PROCESS_QUERY_INFORMATION (0x0400)
+    $handle = [MemoryManager]::OpenProcess(0x0500, $false, $proc.Id)
+    if ($handle -ne [IntPtr]::Zero) {
+      [MemoryManager]::EmptyWorkingSet($handle) | Out-Null
+      [MemoryManager]::CloseHandle($handle) | Out-Null
+      $freedCount++
+      $processNames += $proc.ProcessName
+    }
+  } catch {
+    # Silently skip processes we can't access
+  }
+}
+
+# Also trigger .NET garbage collection
+[System.GC]::Collect()
+[System.GC]::WaitForPendingFinalizers()
+[System.GC]::Collect()
+
+# Output unique process names separated by semicolons
+$uniqueNames = $processNames | Select-Object -Unique
+Write-Output "$freedCount|$skippedCount|$($uniqueNames -join ';')"
+`;
+
+    // Write script to temp file
+    fs.writeFileSync(tempScriptPath, softBoostScript, 'utf8');
+
+    try {
+      // Execute the script file
+      const { stdout } = await execAsync(`powershell -ExecutionPolicy Bypass -File "${tempScriptPath}"`);
+      
+      // Parse output: "freedCount|skippedCount|processName1;processName2;..."
+      const [freedCount, skippedCount, processNames] = stdout.trim().split('|');
+      const affectedProcesses = processNames ? processNames.split(';').filter(n => n.trim()) : [];
+      
+      // Wait a moment for memory to settle
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const memAfter = await si.mem();
+      const freedMemory = memBefore.used - memAfter.used;
+
+      lastBoostTime = Date.now();
+
+      return {
+        success: true,
+        freedMemory: Math.max(0, freedMemory),
+        memoryBefore: memBefore.used,
+        memoryAfter: memAfter.used,
+        currentFree: memAfter.free,
+        currentUsed: memAfter.used,
+        mode: 'soft',
+        processesAffected: affectedProcesses
+      };
+    } finally {
+      // Clean up temp script file
+      try {
+        fs.unlinkSync(tempScriptPath);
+      } catch {}
+    }
+  } catch (error) {
+    console.error('Soft boost error:', error);
+    return { success: false, error: String(error) };
+  }
+});
+
+/**
+ * Hard Boost - Clear Standby List (requires Admin)
+ * Aggressive operation that clears Windows file cache
+ */
+ipcMain.handle('boost-ram-hard', async () => {
+  try {
+    // Check cooldown
+    const now = Date.now();
+    const timeSinceLastBoost = now - lastBoostTime;
+    if (lastBoostTime > 0 && timeSinceLastBoost < BOOST_COOLDOWN_MS) {
+      const remainingSeconds = Math.ceil((BOOST_COOLDOWN_MS - timeSinceLastBoost) / 1000);
+      return { 
+        success: false, 
+        error: `Please wait ${remainingSeconds} seconds before boosting again`,
+        cooldownRemaining: remainingSeconds
+      };
+    }
+
+    const si = require('systeminformation');
+    const memBefore = await si.mem();
+
+    // Create temp script files
+    const tempSoftPath = path.join(os.tmpdir(), `padma-soft-${Date.now()}.ps1`);
+    const tempHardPath = path.join(os.tmpdir(), `padma-hard-${Date.now()}.ps1`);
+
+    // Soft boost script
+    const softScript = `
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public class MemMgr {
+  [DllImport("psapi.dll")]
+  public static extern bool EmptyWorkingSet(IntPtr hProcess);
+  [DllImport("kernel32.dll")]
+  public static extern IntPtr OpenProcess(int dwDesiredAccess, bool bInheritHandle, int dwProcessId);
+  [DllImport("kernel32.dll")]
+  public static extern bool CloseHandle(IntPtr hObject);
+}
+'@
+
+$criticalProcesses = @('system', 'registry', 'smss', 'csrss', 'wininit', 'services', 'lsass', 'winlogon', 'svchost', 'dwm', 'ntoskrnl', 'audiodg', 'electron')
+$processNames = @()
+
+Get-Process | ForEach-Object {
+  if ($criticalProcesses -notcontains $_.ProcessName.ToLower()) {
+    try {
+      $handle = [MemMgr]::OpenProcess(0x0500, $false, $_.Id)
+      if ($handle -ne [IntPtr]::Zero) {
+        [MemMgr]::EmptyWorkingSet($handle) | Out-Null
+        [MemMgr]::CloseHandle($handle) | Out-Null
+        $processNames += $_.ProcessName
+      }
+    } catch {}
+  }
+}
+
+[System.GC]::Collect()
+[System.GC]::WaitForPendingFinalizers()
+$uniqueNames = $processNames | Select-Object -Unique
+Write-Output "Soft|$($uniqueNames -join ';')"
+`;
+
+    // Hard boost script (standby list clearing)
+    const hardScript = `
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+public class StandbyListCleaner {
+  [DllImport("ntdll.dll")]
+  public static extern uint NtSetSystemInformation(int InfoClass, IntPtr Info, int Length);
+  
+  [DllImport("kernel32.dll")]
+  public static extern IntPtr GetCurrentProcess();
+  
+  [DllImport("advapi32.dll", SetLastError = true)]
+  public static extern bool OpenProcessToken(IntPtr ProcessHandle, uint DesiredAccess, out IntPtr TokenHandle);
+  
+  [DllImport("advapi32.dll", SetLastError = true)]
+  public static extern bool LookupPrivilegeValue(string lpSystemName, string lpName, out long lpLuid);
+  
+  [DllImport("advapi32.dll", SetLastError = true)]
+  public static extern bool AdjustTokenPrivileges(IntPtr TokenHandle, bool DisableAllPrivileges, ref TOKEN_PRIVILEGES NewState, int BufferLength, IntPtr PreviousState, IntPtr ReturnLength);
+  
+  [DllImport("kernel32.dll")]
+  public static extern bool CloseHandle(IntPtr hObject);
+  
+  public struct TOKEN_PRIVILEGES {
+    public int PrivilegeCount;
+    public long Luid;
+    public int Attributes;
+  }
+  
+  public const int SE_PRIVILEGE_ENABLED = 0x00000002;
+  public const uint TOKEN_ADJUST_PRIVILEGES = 0x0020;
+  public const uint TOKEN_QUERY = 0x0008;
+  
+  public static bool ClearStandbyList() {
+    try {
+      IntPtr tokenHandle;
+      OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, out tokenHandle);
+      
+      TOKEN_PRIVILEGES tp = new TOKEN_PRIVILEGES();
+      tp.PrivilegeCount = 1;
+      LookupPrivilegeValue(null, "SeProfileSingleProcessPrivilege", out tp.Luid);
+      tp.Attributes = SE_PRIVILEGE_ENABLED;
+      AdjustTokenPrivileges(tokenHandle, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
+      
+      int command = 4;
+      IntPtr commandPtr = Marshal.AllocHGlobal(sizeof(int));
+      Marshal.WriteInt32(commandPtr, command);
+      uint result = NtSetSystemInformation(80, commandPtr, sizeof(int));
+      Marshal.FreeHGlobal(commandPtr);
+      CloseHandle(tokenHandle);
+      
+      return result == 0;
+    } catch {
+      return false;
+    }
+  }
+}
+'@
+
+try {
+  $result = [StandbyListCleaner]::ClearStandbyList()
+  if ($result) {
+    Write-Output "Hard boost SUCCESS"
+  } else {
+    Write-Output "Hard boost PARTIAL (may need admin)"
+  }
+} catch {
+  Write-Output "Hard boost FAILED: $_"
+}
+`;
+
+    try {
+      // Write scripts to temp files
+      fs.writeFileSync(tempSoftPath, softScript, 'utf8');
+      fs.writeFileSync(tempHardPath, hardScript, 'utf8');
+
+      // Execute soft boost first
+      const { stdout: softOutput } = await execAsync(`powershell -ExecutionPolicy Bypass -File "${tempSoftPath}"`);
+      
+      // Parse soft boost output: "Soft|processName1;processName2;..."
+      const softParts = softOutput.trim().split('|');
+      const affectedProcesses = softParts[1] ? softParts[1].split(';').filter(n => n.trim()) : [];
+
+      // Then try hard boost (may fail without admin)
+      let hardBoostSuccess = false;
+      try {
+        const { stdout: hardOutput } = await execAsync(`powershell -ExecutionPolicy Bypass -File "${tempHardPath}"`);
+        hardBoostSuccess = hardOutput.includes('SUCCESS');
+      } catch (e) {
+        console.log('Hard boost requires admin privileges, continuing with soft boost results');
+      }
+
+      // Wait for memory to settle
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      const memAfter = await si.mem();
+      const freedMemory = memBefore.used - memAfter.used;
+
+      lastBoostTime = Date.now();
+
+      return {
+        success: true,
+        freedMemory: Math.max(0, freedMemory),
+        memoryBefore: memBefore.used,
+        memoryAfter: memAfter.used,
+        currentFree: memAfter.free,
+        currentUsed: memAfter.used,
+        mode: 'hard',
+        processesAffected: affectedProcesses,
+        hardBoostApplied: hardBoostSuccess
+      };
+    } finally {
+      // Clean up temp script files
+      try {
+        fs.unlinkSync(tempSoftPath);
+      } catch {}
+      try {
+        fs.unlinkSync(tempHardPath);
+      } catch {}
+    }
+  } catch (error) {
+    console.error('Hard boost error:', error);
+    return { success: false, error: String(error) };
+  }
+});
+
+/**
+ * Legacy boost-ram handler for backwards compatibility
+ * Calls soft boost by default
+ */
 ipcMain.handle('boost-ram', async () => {
   try {
-    // Attempt to clear standby memory using Windows API
+    const si = require('systeminformation');
+    const memBefore = await si.mem();
+
+    // Simple soft boost using PowerShell
     await execAsync('powershell -Command "[System.GC]::Collect(); [System.GC]::WaitForPendingFinalizers()"');
     
-    // Get memory info before and after
-    const si = require('systeminformation');
     const memAfter = await si.mem();
     
     return {
       success: true,
-      freedMemory: 0, // Actual freed memory would require before/after comparison
+      freedMemory: Math.max(0, memBefore.used - memAfter.used),
       currentFree: memAfter.free,
       currentUsed: memAfter.used
     };
   } catch (error) {
     return { success: false, error: String(error) };
   }
+});
+
+/**
+ * Get boost cooldown status
+ */
+ipcMain.handle('get-boost-cooldown', async () => {
+  const now = Date.now();
+  const timeSinceLastBoost = now - lastBoostTime;
+  
+  if (lastBoostTime === 0 || timeSinceLastBoost >= BOOST_COOLDOWN_MS) {
+    return { canBoost: true, remainingSeconds: 0 };
+  }
+  
+  const remainingSeconds = Math.ceil((BOOST_COOLDOWN_MS - timeSinceLastBoost) / 1000);
+  return { canBoost: false, remainingSeconds };
 });
 
 // ============================================================================
