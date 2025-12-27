@@ -29,6 +29,7 @@ export class ShuddhiPanel extends BasePanel {
   }
 
   private initializeCategories(): void {
+    console.log('[Shuddhi] Initializing categories...');
     this.categories = [
       {
         id: 'temp',
@@ -122,6 +123,8 @@ export class ShuddhiPanel extends BasePanel {
         files: []
       }
     ];
+    console.log('[Shuddhi] Categories initialized:', this.categories.length, 'total');
+    console.log('[Shuddhi] Category IDs:', this.categories.map(c => c.id));
   }
 
   protected async loadData(): Promise<void> {
@@ -216,6 +219,7 @@ export class ShuddhiPanel extends BasePanel {
   }
 
   private renderCategories(): string {
+    console.log('[Shuddhi] renderCategories called with', this.categories.length, 'categories');
     return this.categories.map(cat => `
       <div class="glass-card category-card" data-category="${cat.id}">
         <div class="category-header">
@@ -286,45 +290,85 @@ export class ShuddhiPanel extends BasePanel {
     if (scanResult) scanResult.style.display = 'none';
 
     try {
-      const categoryIds = this.categories.map(c => c.id);
+      // Always use hardcoded list to ensure all categories are scanned
+      const ALL_CATEGORIES = ['temp', 'prefetch', 'logs', 'recycle', 'browser-chrome', 'browser-edge', 'browser-firefox'];
+      
+      // Reinitialize categories if needed
+      if (this.categories.length !== 7) {
+        console.log(`[Shuddhi] WARNING: Categories array has ${this.categories.length} items, expected 7. Reinitializing...`);
+        this.initializeCategories();
+      }
+      
+      console.log('[Shuddhi] Starting scan with ALL_CATEGORIES:', ALL_CATEGORIES);
+      console.log('[Shuddhi] this.categories has:', this.categories.map(c => c.id));
       let scanned = 0;
+      
+      // Store all results
+      const scanResults: { [key: string]: { size: number; files: string[] } } = {};
 
       // Scan each category
-      for (const catId of categoryIds) {
+      for (const catId of ALL_CATEGORIES) {
         if (progressBar) {
-          progressBar.style.width = `${(scanned / categoryIds.length) * 100}%`;
+          progressBar.style.width = `${(scanned / ALL_CATEGORIES.length) * 100}%`;
         }
         if (progressText) {
           const cat = this.categories.find(c => c.id === catId);
           progressText.textContent = `Scanning ${cat?.name || catId}...`;
         }
 
+        console.log(`[Shuddhi] Scanning category: ${catId}`);
         const result = await window.electron.scanJunk([catId]);
+        console.log(`[Shuddhi] Result for ${catId}:`, result);
         
         if (result[catId]) {
-          const category = this.categories.find(c => c.id === catId);
-          if (category) {
-            category.size = result[catId].size;
-            category.files = result[catId].files;
-          }
+          scanResults[catId] = result[catId];
+          console.log(`[Shuddhi] Stored result for ${catId}: ${this.formatBytes(result[catId].size)}`);
         }
 
         scanned++;
       }
 
-      // Update UI with results
-      this.totalJunkFound = this.categories.reduce((acc, cat) => acc + cat.size, 0);
+      // Calculate total from scanResults
+      let totalSize = 0;
+      for (const catId of ALL_CATEGORIES) {
+        if (scanResults[catId]) {
+          totalSize += scanResults[catId].size;
+        }
+      }
       
-      // Update category sizes
+      // Update categories array if they exist
       this.categories.forEach(cat => {
-        this.setText(`#size-${cat.id}`, cat.size > 0 ? this.formatBytes(cat.size) : '0 B');
+        if (scanResults[cat.id]) {
+          cat.size = scanResults[cat.id].size;
+          cat.files = scanResults[cat.id].files;
+        }
       });
+
+      this.totalJunkFound = totalSize;
+      console.log(`[Shuddhi] Total junk found: ${this.formatBytes(this.totalJunkFound)}`);
+      
+      // Update UI using ALL_CATEGORIES
+      for (const catId of ALL_CATEGORIES) {
+        const size = scanResults[catId]?.size || 0;
+        const sizeText = size > 0 ? this.formatBytes(size) : '0 B';
+        const element = this.getElement(`#size-${catId}`);
+        if (element) {
+          element.textContent = sizeText;
+          console.log(`[Shuddhi] Updated UI for ${catId}: ${sizeText}`);
+        } else {
+          console.log(`[Shuddhi] WARNING: Element #size-${catId} not found in DOM!`);
+        }
+      }
 
       // Show results
       if (progressContainer) progressContainer.style.display = 'none';
       if (scanResult) {
         scanResult.style.display = 'flex';
-        this.setText('#total-junk', this.formatBytes(this.totalJunkFound));
+        const totalJunkElement = this.getElement('#total-junk');
+        if (totalJunkElement) {
+          totalJunkElement.textContent = this.formatBytes(this.totalJunkFound);
+          console.log(`[Shuddhi] Updated total display: ${this.formatBytes(this.totalJunkFound)}`);
+        }
       }
 
       // Enable clean button

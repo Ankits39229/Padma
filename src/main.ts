@@ -16,6 +16,37 @@ let tray: Tray | null = null;
 let isQuitting = false;
 
 // ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Check if running with administrator privileges
+ */
+function isAdmin(): boolean {
+  try {
+    // Try to write to a system directory
+    const testPath = 'C:\\Windows\\Temp\\padma_admin_test';
+    fs.writeFileSync(testPath, 'test');
+    fs.unlinkSync(testPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get the actual size of directory contents safely
+ */
+async function safeGetSize(dirPath: string): Promise<number> {
+  try {
+    const result = await getDirectorySize(dirPath, 5);
+    return result.size;
+  } catch {
+    return 0;
+  }
+}
+
+// ============================================================================
 // WINDOW CREATION
 // ============================================================================
 
@@ -186,9 +217,14 @@ interface JunkItem {
   category: string;
 }
 
-async function getDirectorySize(dirPath: string): Promise<{ size: number; files: string[] }> {
+async function getDirectorySize(dirPath: string, maxDepth: number = 10, currentDepth: number = 0): Promise<{ size: number; files: string[] }> {
   let totalSize = 0;
   const files: string[] = [];
+  
+  // Prevent infinite recursion
+  if (currentDepth > maxDepth) {
+    return { size: 0, files: [] };
+  }
   
   try {
     if (!fs.existsSync(dirPath)) {
@@ -205,96 +241,194 @@ async function getDirectorySize(dirPath: string): Promise<{ size: number; files:
           totalSize += stat.size;
           files.push(fullPath);
         } else if (stat.isDirectory()) {
-          const subResult = await getDirectorySize(fullPath);
+          const subResult = await getDirectorySize(fullPath, maxDepth, currentDepth + 1);
           totalSize += subResult.size;
           files.push(...subResult.files);
         }
       } catch (err) {
-        // Skip files we can't access
+        // Skip files we can't access (locked, permissions, etc.)
+        console.log(`Skipping inaccessible file: ${fullPath}`);
       }
     }
   } catch (err) {
     // Skip directories we can't access
+    console.log(`Skipping inaccessible directory: ${dirPath}`);
   }
   
   return { size: totalSize, files };
 }
 
 ipcMain.handle('scan-junk', async (_, categories: string[]) => {
+  console.log(`[IPC] scan-junk called with categories:`, categories);
   const results: { [key: string]: { size: number; files: string[] } } = {};
   
-  const tempPath = process.env.TEMP || path.join(os.homedir(), 'AppData', 'Local', 'Temp');
+  // Define all temp and cache paths
+  const userTemp = process.env.TEMP || path.join(os.homedir(), 'AppData', 'Local', 'Temp');
   const windowsTemp = 'C:\\Windows\\Temp';
   const prefetchPath = 'C:\\Windows\\Prefetch';
+  const crashDumpsPath = path.join(os.homedir(), 'AppData', 'Local', 'CrashDumps');
+  const windowsLogsPath = 'C:\\Windows\\Logs';
   
   for (const category of categories) {
-    switch (category) {
-      case 'temp':
-        const userTemp = await getDirectorySize(tempPath);
-        let winTemp = { size: 0, files: [] as string[] };
-        try {
-          winTemp = await getDirectorySize(windowsTemp);
-        } catch {}
-        results['temp'] = {
-          size: userTemp.size + winTemp.size,
-          files: [...userTemp.files, ...winTemp.files]
-        };
-        break;
-        
-      case 'prefetch':
-        try {
-          results['prefetch'] = await getDirectorySize(prefetchPath);
-        } catch {
-          results['prefetch'] = { size: 0, files: [] };
-        }
-        break;
-        
-      case 'logs':
-        const logsPath = path.join(os.homedir(), 'AppData', 'Local', 'CrashDumps');
-        results['logs'] = await getDirectorySize(logsPath);
-        break;
-        
-      case 'browser-chrome':
-        const chromeCachePath = path.join(
-          os.homedir(),
-          'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Cache'
-        );
-        results['browser-chrome'] = await getDirectorySize(chromeCachePath);
-        break;
-        
-      case 'browser-edge':
-        const edgeCachePath = path.join(
-          os.homedir(),
-          'AppData', 'Local', 'Microsoft', 'Edge', 'User Data', 'Default', 'Cache'
-        );
-        results['browser-edge'] = await getDirectorySize(edgeCachePath);
-        break;
-        
-      case 'browser-firefox':
-        const firefoxPath = path.join(os.homedir(), 'AppData', 'Local', 'Mozilla', 'Firefox', 'Profiles');
-        let firefoxSize = 0;
-        const firefoxFiles: string[] = [];
-        if (fs.existsSync(firefoxPath)) {
-          const profiles = fs.readdirSync(firefoxPath);
-          for (const profile of profiles) {
-            const cachePath = path.join(firefoxPath, profile, 'cache2');
-            const cacheResult = await getDirectorySize(cachePath);
-            firefoxSize += cacheResult.size;
-            firefoxFiles.push(...cacheResult.files);
+    console.log(`Scanning category: ${category}`);
+    
+    try {
+      switch (category) {
+        case 'temp': {
+          // Scan user temp folder
+          const userTempResult = await getDirectorySize(userTemp, 5);
+          let winTempResult = { size: 0, files: [] as string[] };
+          
+          // Try to scan Windows temp (may require admin)
+          try {
+            if (fs.existsSync(windowsTemp)) {
+              winTempResult = await getDirectorySize(windowsTemp, 5);
+            }
+          } catch (err) {
+            console.log('Cannot access Windows Temp (may require admin)');
           }
+          
+          results['temp'] = {
+            size: userTempResult.size + winTempResult.size,
+            files: [...userTempResult.files, ...winTempResult.files]
+          };
+          break;
         }
-        results['browser-firefox'] = { size: firefoxSize, files: firefoxFiles };
-        break;
         
-      case 'recycle':
-        try {
-          const { stdout } = await execAsync('powershell -Command "(Get-ChildItem -Path \'C:\\$Recycle.Bin\' -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum"');
-          const size = parseInt(stdout.trim()) || 0;
-          results['recycle'] = { size, files: ['C:\\$Recycle.Bin'] };
-        } catch {
-          results['recycle'] = { size: 0, files: [] };
+        case 'prefetch': {
+          // Prefetch files - requires admin to clean
+          if (fs.existsSync(prefetchPath)) {
+            try {
+              results['prefetch'] = await getDirectorySize(prefetchPath, 2);
+            } catch (err) {
+              console.log('Cannot access Prefetch (requires admin)');
+              results['prefetch'] = { size: 0, files: [] };
+            }
+          } else {
+            results['prefetch'] = { size: 0, files: [] };
+          }
+          break;
         }
-        break;
+        
+        case 'logs': {
+          // Scan crash dumps and Windows logs
+          let totalSize = 0;
+          let allFiles: string[] = [];
+          
+          // User crash dumps
+          if (fs.existsSync(crashDumpsPath)) {
+            const crashResult = await getDirectorySize(crashDumpsPath, 3);
+            totalSize += crashResult.size;
+            allFiles.push(...crashResult.files);
+          }
+          
+          // Windows logs (may require admin)
+          try {
+            if (fs.existsSync(windowsLogsPath)) {
+              const logsResult = await getDirectorySize(windowsLogsPath, 3);
+              totalSize += logsResult.size;
+              allFiles.push(...logsResult.files);
+            }
+          } catch (err) {
+            console.log('Cannot access Windows Logs (may require admin)');
+          }
+          
+          results['logs'] = { size: totalSize, files: allFiles };
+          break;
+        }
+        
+        case 'browser-chrome': {
+          const chromePaths = [
+            path.join(os.homedir(), 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Cache'),
+            path.join(os.homedir(), 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Code Cache'),
+            path.join(os.homedir(), 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'GPUCache')
+          ];
+          
+          let totalSize = 0;
+          let allFiles: string[] = [];
+          
+          for (const cachePath of chromePaths) {
+            if (fs.existsSync(cachePath)) {
+              const result = await getDirectorySize(cachePath, 3);
+              totalSize += result.size;
+              allFiles.push(...result.files);
+            }
+          }
+          
+          results['browser-chrome'] = { size: totalSize, files: allFiles };
+          break;
+        }
+        
+        case 'browser-edge': {
+          const edgePaths = [
+            path.join(os.homedir(), 'AppData', 'Local', 'Microsoft', 'Edge', 'User Data', 'Default', 'Cache'),
+            path.join(os.homedir(), 'AppData', 'Local', 'Microsoft', 'Edge', 'User Data', 'Default', 'Code Cache'),
+            path.join(os.homedir(), 'AppData', 'Local', 'Microsoft', 'Edge', 'User Data', 'Default', 'GPUCache')
+          ];
+          
+          let totalSize = 0;
+          let allFiles: string[] = [];
+          
+          for (const cachePath of edgePaths) {
+            if (fs.existsSync(cachePath)) {
+              const result = await getDirectorySize(cachePath, 3);
+              totalSize += result.size;
+              allFiles.push(...result.files);
+            }
+          }
+          
+          results['browser-edge'] = { size: totalSize, files: allFiles };
+          break;
+        }
+        
+        case 'browser-firefox': {
+          const firefoxProfilesPath = path.join(os.homedir(), 'AppData', 'Local', 'Mozilla', 'Firefox', 'Profiles');
+          let totalSize = 0;
+          let allFiles: string[] = [];
+          
+          if (fs.existsSync(firefoxProfilesPath)) {
+            try {
+              const profiles = fs.readdirSync(firefoxProfilesPath);
+              for (const profile of profiles) {
+                const cachePath = path.join(firefoxProfilesPath, profile, 'cache2');
+                if (fs.existsSync(cachePath)) {
+                  const result = await getDirectorySize(cachePath, 3);
+                  totalSize += result.size;
+                  allFiles.push(...result.files);
+                }
+              }
+            } catch (err) {
+              console.log('Error scanning Firefox cache:', err);
+            }
+          }
+          
+          results['browser-firefox'] = { size: totalSize, files: allFiles };
+          break;
+        }
+        
+        case 'recycle': {
+          // Use PowerShell to get recycle bin size
+          try {
+            const { stdout } = await execAsync(
+              'powershell -Command "$size = (Get-ChildItem -Path \'C:\\$Recycle.Bin\' -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum; if ($size) { $size } else { 0 }"'
+            );
+            const size = parseInt(stdout.trim()) || 0;
+            results['recycle'] = { size, files: ['C:\\$Recycle.Bin'] };
+          } catch (err) {
+            console.log('Error scanning recycle bin:', err);
+            results['recycle'] = { size: 0, files: [] };
+          }
+          break;
+        }
+        
+        default:
+          results[category] = { size: 0, files: [] };
+      }
+      
+      console.log(`Category ${category} scanned: ${results[category]?.size || 0} bytes found`);
+    } catch (error) {
+      console.error(`Error scanning category ${category}:`, error);
+      results[category] = { size: 0, files: [] };
     }
   }
   
@@ -304,46 +438,143 @@ ipcMain.handle('scan-junk', async (_, categories: string[]) => {
 ipcMain.handle('clean-junk', async (_, categories: string[]) => {
   const cleaned: { [key: string]: { success: boolean; freedSpace: number } } = {};
   
-  const tempPath = process.env.TEMP || path.join(os.homedir(), 'AppData', 'Local', 'Temp');
+  // Define all paths
+  const userTemp = process.env.TEMP || path.join(os.homedir(), 'AppData', 'Local', 'Temp');
+  const windowsTemp = 'C:\\Windows\\Temp';
+  const prefetchPath = 'C:\\Windows\\Prefetch';
+  const crashDumpsPath = path.join(os.homedir(), 'AppData', 'Local', 'CrashDumps');
   
   for (const category of categories) {
+    console.log(`Cleaning category: ${category}`);
+    let freedSpace = 0;
+    let success = false;
+    
     try {
       switch (category) {
-        case 'temp':
-          const tempResult = await getDirectorySize(tempPath);
-          await deleteFilesInDirectory(tempPath);
-          cleaned['temp'] = { success: true, freedSpace: tempResult.size };
-          break;
+        case 'temp': {
+          // Clean user temp
+          const userTempSize = await getDirectorySize(userTemp, 5);
+          await deleteFilesInDirectory(userTemp);
+          freedSpace = userTempSize.size;
           
-        case 'recycle':
-          await execAsync('powershell -Command "Clear-RecycleBin -Force -ErrorAction SilentlyContinue"');
-          cleaned['recycle'] = { success: true, freedSpace: 0 };
-          break;
+          // Try to clean Windows temp (may require admin)
+          try {
+            if (fs.existsSync(windowsTemp)) {
+              const winTempSize = await getDirectorySize(windowsTemp, 5);
+              await deleteFilesInDirectory(windowsTemp);
+              freedSpace += winTempSize.size;
+            }
+          } catch (err) {
+            console.log('Cannot clean Windows Temp (may require admin)');
+          }
           
-        case 'browser-chrome':
-          const chromeCachePath = path.join(
-            os.homedir(),
-            'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Cache'
-          );
-          const chromeResult = await getDirectorySize(chromeCachePath);
-          await deleteFilesInDirectory(chromeCachePath);
-          cleaned['browser-chrome'] = { success: true, freedSpace: chromeResult.size };
+          success = true;
           break;
-          
-        case 'browser-edge':
-          const edgeCachePath = path.join(
-            os.homedir(),
-            'AppData', 'Local', 'Microsoft', 'Edge', 'User Data', 'Default', 'Cache'
-          );
-          const edgeResult = await getDirectorySize(edgeCachePath);
-          await deleteFilesInDirectory(edgeCachePath);
-          cleaned['browser-edge'] = { success: true, freedSpace: edgeResult.size };
+        }
+        
+        case 'prefetch': {
+          // Prefetch requires admin privileges
+          if (fs.existsSync(prefetchPath)) {
+            try {
+              const prefetchSize = await getDirectorySize(prefetchPath, 2);
+              await deleteFilesInDirectory(prefetchPath);
+              freedSpace = prefetchSize.size;
+              success = true;
+            } catch (err) {
+              console.log('Cannot clean Prefetch (requires admin)');
+              success = false;
+            }
+          }
           break;
+        }
+        
+        case 'logs': {
+          // Clean crash dumps
+          if (fs.existsSync(crashDumpsPath)) {
+            const crashSize = await getDirectorySize(crashDumpsPath, 3);
+            await deleteFilesInDirectory(crashDumpsPath);
+            freedSpace += crashSize.size;
+          }
+          success = true;
+          break;
+        }
+        
+        case 'browser-chrome': {
+          const chromePaths = [
+            path.join(os.homedir(), 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Cache'),
+            path.join(os.homedir(), 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Code Cache'),
+            path.join(os.homedir(), 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'GPUCache')
+          ];
           
+          for (const cachePath of chromePaths) {
+            if (fs.existsSync(cachePath)) {
+              const cacheSize = await getDirectorySize(cachePath, 3);
+              await deleteFilesInDirectory(cachePath);
+              freedSpace += cacheSize.size;
+            }
+          }
+          success = true;
+          break;
+        }
+        
+        case 'browser-edge': {
+          const edgePaths = [
+            path.join(os.homedir(), 'AppData', 'Local', 'Microsoft', 'Edge', 'User Data', 'Default', 'Cache'),
+            path.join(os.homedir(), 'AppData', 'Local', 'Microsoft', 'Edge', 'User Data', 'Default', 'Code Cache'),
+            path.join(os.homedir(), 'AppData', 'Local', 'Microsoft', 'Edge', 'User Data', 'Default', 'GPUCache')
+          ];
+          
+          for (const cachePath of edgePaths) {
+            if (fs.existsSync(cachePath)) {
+              const cacheSize = await getDirectorySize(cachePath, 3);
+              await deleteFilesInDirectory(cachePath);
+              freedSpace += cacheSize.size;
+            }
+          }
+          success = true;
+          break;
+        }
+        
+        case 'browser-firefox': {
+          const firefoxProfilesPath = path.join(os.homedir(), 'AppData', 'Local', 'Mozilla', 'Firefox', 'Profiles');
+          
+          if (fs.existsSync(firefoxProfilesPath)) {
+            const profiles = fs.readdirSync(firefoxProfilesPath);
+            for (const profile of profiles) {
+              const cachePath = path.join(firefoxProfilesPath, profile, 'cache2');
+              if (fs.existsSync(cachePath)) {
+                const cacheSize = await getDirectorySize(cachePath, 3);
+                await deleteFilesInDirectory(cachePath);
+                freedSpace += cacheSize.size;
+              }
+            }
+          }
+          success = true;
+          break;
+        }
+        
+        case 'recycle': {
+          // Empty recycle bin using PowerShell
+          try {
+            await execAsync('powershell -Command "Clear-RecycleBin -Force -ErrorAction SilentlyContinue"');
+            success = true;
+            freedSpace = 0; // Can't accurately measure recycle bin space freed
+          } catch (err) {
+            console.log('Error emptying recycle bin:', err);
+            success = false;
+          }
+          break;
+        }
+        
         default:
-          cleaned[category] = { success: false, freedSpace: 0 };
+          success = false;
       }
+      
+      cleaned[category] = { success, freedSpace };
+      console.log(`Category ${category} cleaned: ${freedSpace} bytes freed, success: ${success}`);
+      
     } catch (error) {
+      console.error(`Error cleaning category ${category}:`, error);
       cleaned[category] = { success: false, freedSpace: 0 };
     }
   }
@@ -351,23 +582,42 @@ ipcMain.handle('clean-junk', async (_, categories: string[]) => {
   return cleaned;
 });
 
-async function deleteFilesInDirectory(dirPath: string): Promise<void> {
-  if (!fs.existsSync(dirPath)) return;
+async function deleteFilesInDirectory(dirPath: string): Promise<number> {
+  if (!fs.existsSync(dirPath)) return 0;
   
-  const items = fs.readdirSync(dirPath);
-  for (const item of items) {
-    const fullPath = path.join(dirPath, item);
-    try {
-      const stat = fs.statSync(fullPath);
-      if (stat.isDirectory()) {
-        fs.rmSync(fullPath, { recursive: true, force: true });
-      } else {
-        fs.unlinkSync(fullPath);
+  let deletedCount = 0;
+  
+  try {
+    const items = fs.readdirSync(dirPath);
+    
+    for (const item of items) {
+      const fullPath = path.join(dirPath, item);
+      try {
+        const stat = fs.statSync(fullPath);
+        
+        if (stat.isDirectory()) {
+          // Recursively delete directory
+          fs.rmSync(fullPath, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+          deletedCount++;
+        } else if (stat.isFile()) {
+          // Delete file
+          fs.unlinkSync(fullPath);
+          deletedCount++;
+        }
+      } catch (err: any) {
+        // Skip files that are locked or in use
+        if (err.code === 'EBUSY' || err.code === 'EPERM' || err.code === 'EACCES') {
+          console.log(`File in use, skipping: ${fullPath}`);
+        } else {
+          console.log(`Error deleting ${fullPath}:`, err.message);
+        }
       }
-    } catch (err) {
-      // Skip files that are in use
     }
+  } catch (err) {
+    console.log(`Error accessing directory ${dirPath}:`, err);
   }
+  
+  return deletedCount;
 }
 
 // ============================================================================
