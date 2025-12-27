@@ -1,0 +1,203 @@
+/* ============================================================================
+   SHUDDHI (CLEANER) PANEL STYLES
+   ============================================================================ */
+
+.shuddhi-content {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Scan Section */
+.scan-section {
+  margin-bottom: 32px;
+}
+
+.scan-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 32px;
+  gap: 24px;
+}
+
+.scan-info {
+  flex: 1;
+}
+
+.scan-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-icon {
+  font-size: 24px;
+}
+
+.status-text {
+  font-size: 16px;
+  color: var(--text-secondary);
+}
+
+.scan-result {
+  display: flex;
+  flex-direction: column;
+}
+
+.result-amount {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--accent-warning);
+}
+
+.result-label {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.scan-actions {
+  display: flex;
+  gap: 12px;
+}
+
+/* Progress Container */
+.scan-progress-container {
+  margin-bottom: 32px;
+  padding: 0 8px;
+}
+
+.progress-text {
+  text-align: center;
+  margin-top: 12px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* Categories Section */
+.categories-section {
+  margin-bottom: 32px;
+}
+
+.categories-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.category-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  cursor: pointer;
+}
+
+.category-card:hover {
+  transform: translateY(-2px);
+}
+
+.category-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.category-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(135deg, rgba(90, 127, 168, 0.1), rgba(124, 159, 194, 0.1));
+  border-radius: 12px;
+  color: var(--accent-primary);
+}
+
+.category-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.category-info {
+  flex: 1;
+}
+
+.category-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.category-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.category-size {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  min-width: 80px;
+  text-align: right;
+}
+
+/* Tips Section */
+.tips-section {
+  margin-top: 32px;
+}
+
+.tips-card {
+  padding: 24px;
+}
+
+.tips-card h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
+.tips-list {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.tips-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  padding: 8px 12px;
+  background: var(--bg-glass);
+  border-radius: 10px;
+}
+
+.tips-list li::before {
+  content: "💡";
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .scan-card {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .scan-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+  
+  .categories-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .tips-list {
+    grid-template-columns: 1fr;
+  }
+}

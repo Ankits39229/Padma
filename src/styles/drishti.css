@@ -1,0 +1,374 @@
+/* ============================================================================
+   DRISHTI (ANALYZER) PANEL STYLES
+   ============================================================================ */
+
+.drishti-content {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Analysis Grid */
+.analysis-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.analysis-card {
+  min-height: 360px;
+}
+
+/* Disk Visualization */
+.disk-viz-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+}
+
+.disk-viz-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  color: var(--text-muted);
+}
+
+.placeholder-icon {
+  width: 64px;
+  height: 64px;
+  opacity: 0.3;
+}
+
+.sunburst-chart {
+  width: 100%;
+  max-width: 280px;
+}
+
+.sunburst-segment {
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.sunburst-segment:hover {
+  opacity: 0.8;
+}
+
+.sunburst-center-text {
+  font-size: 12px;
+  fill: var(--text-muted);
+}
+
+.sunburst-center-value {
+  font-size: 14px;
+  font-weight: 700;
+  fill: var(--text-primary);
+}
+
+.disk-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 16px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.legend-name {
+  color: var(--text-secondary);
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.legend-size {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Health List */
+.health-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.health-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: var(--bg-glass);
+  border-radius: 14px;
+  transition: var(--transition-default);
+}
+
+.health-item:hover {
+  background: var(--bg-glass-hover);
+}
+
+.health-item .health-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+}
+
+.health-item .health-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.health-good .health-icon {
+  background: rgba(72, 187, 120, 0.15);
+  color: var(--accent-success);
+}
+
+.health-warning .health-icon {
+  background: rgba(237, 137, 54, 0.15);
+  color: var(--accent-warning);
+}
+
+.health-critical .health-icon {
+  background: rgba(245, 101, 101, 0.15);
+  color: var(--accent-danger);
+}
+
+.health-unknown .health-icon {
+  background: rgba(160, 174, 192, 0.15);
+  color: var(--text-muted);
+}
+
+.health-info {
+  flex: 1;
+}
+
+.health-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.health-details {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.health-status {
+  display: flex;
+  align-items: center;
+}
+
+.status-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-badge.health-good {
+  background: rgba(72, 187, 120, 0.15);
+  color: var(--accent-success);
+}
+
+.status-badge.health-warning {
+  background: rgba(237, 137, 54, 0.15);
+  color: var(--accent-warning);
+}
+
+.status-badge.health-critical {
+  background: rgba(245, 101, 101, 0.15);
+  color: var(--accent-danger);
+}
+
+.status-badge.health-unknown {
+  background: rgba(160, 174, 192, 0.15);
+  color: var(--text-muted);
+}
+
+/* Largest Files Section */
+.largest-files-section {
+  margin-bottom: 32px;
+}
+
+.files-card {
+  overflow: hidden;
+}
+
+.files-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.files-header {
+  display: grid;
+  grid-template-columns: 40px 1fr 1.5fr 100px 50px;
+  gap: 16px;
+  padding: 12px 20px;
+  background: var(--bg-glass);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.file-item {
+  display: grid;
+  grid-template-columns: 40px 1fr 1.5fr 100px 50px;
+  gap: 16px;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  transition: var(--transition-fast);
+}
+
+.file-item:hover {
+  background: var(--bg-glass);
+}
+
+.file-item:last-child {
+  border-bottom: none;
+}
+
+.file-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, rgba(90, 127, 168, 0.1), rgba(124, 159, 194, 0.1));
+  border-radius: 10px;
+  color: var(--accent-primary);
+}
+
+.file-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.file-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-path {
+  font-size: 13px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-size {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  text-align: right;
+}
+
+/* Report Section */
+.report-section {
+  margin-bottom: 32px;
+}
+
+.report-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 32px;
+  gap: 24px;
+}
+
+.report-info {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex: 1;
+}
+
+.report-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(135deg, rgba(90, 127, 168, 0.15), rgba(124, 159, 194, 0.15));
+  border-radius: 16px;
+  color: var(--accent-primary);
+}
+
+.report-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.report-text h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.report-text p {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.analyzing-state {
+  flex-direction: column;
+  text-align: center;
+}
+
+.analyzing-note {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+@media (max-width: 900px) {
+  .analysis-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .files-header,
+  .file-item {
+    grid-template-columns: 40px 1fr 80px 40px;
+  }
+  
+  .file-path {
+    display: none;
+  }
+  
+  .report-card {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .report-info {
+    flex-direction: column;
+  }
+}

@@ -1,0 +1,369 @@
+/* ============================================================================
+   PRANA (OPTIMIZER) PANEL STYLES
+   ============================================================================ */
+
+.prana-content {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Optimizer Grid */
+.optimizer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.optimizer-card {
+  min-height: 320px;
+}
+
+.optimizer-card .card-header {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.optimizer-card .card-header h2 {
+  font-size: 20px;
+}
+
+/* RAM Card */
+.ram-stats {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  margin-bottom: 24px;
+}
+
+.ram-circle {
+  position: relative;
+  width: 120px;
+  height: 120px;
+}
+
+.ram-progress-ring {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.ring-bg {
+  fill: none;
+  stroke: rgba(0, 0, 0, 0.05);
+  stroke-width: 8;
+}
+
+.ring-fill {
+  fill: none;
+  stroke: var(--accent-success);
+  stroke-width: 8;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.5s ease, stroke 0.3s ease;
+}
+
+.ram-percent {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.ram-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ram-detail-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.ram-detail-item .label {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.ram-detail-item .value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.boost-btn {
+  width: 100%;
+}
+
+/* Battery Card */
+.no-battery {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: var(--text-muted);
+  gap: 12px;
+}
+
+.no-battery-icon {
+  width: 48px;
+  height: 48px;
+  opacity: 0.5;
+}
+
+.battery-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.battery-visual {
+  display: flex;
+  align-items: center;
+}
+
+.battery-body {
+  width: 80px;
+  height: 36px;
+  background: rgba(0, 0, 0, 0.05);
+  border: 3px solid var(--text-muted);
+  border-radius: 6px;
+  padding: 3px;
+  position: relative;
+}
+
+.battery-level {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease, background 0.3s ease;
+}
+
+.battery-level.good {
+  background: linear-gradient(90deg, var(--accent-success), #68d391);
+}
+
+.battery-level.warning {
+  background: linear-gradient(90deg, var(--accent-warning), #f6ad55);
+}
+
+.battery-level.critical {
+  background: linear-gradient(90deg, var(--accent-danger), #fc8181);
+}
+
+.battery-tip {
+  width: 6px;
+  height: 16px;
+  background: var(--text-muted);
+  border-radius: 0 3px 3px 0;
+  margin-left: 2px;
+}
+
+.battery-percent {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.battery-status {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.battery-details {
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  margin-bottom: 20px;
+}
+
+.battery-detail-item {
+  display: flex;
+  gap: 8px;
+}
+
+.battery-detail-item .label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.battery-detail-item .value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.power-saver-toggle {
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.toggle-label span {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.toggle-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+/* Startup Apps Section */
+.startup-section {
+  margin-bottom: 32px;
+}
+
+.startup-apps-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.startup-app-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.startup-app-item:last-child {
+  border-bottom: none;
+}
+
+.app-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.app-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: var(--bg-glass);
+  border-radius: 10px;
+  color: var(--accent-primary);
+}
+
+.app-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.app-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.app-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.app-location {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Power Plans Section */
+.power-plans-section {
+  margin-bottom: 32px;
+}
+
+.power-plans-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.power-plan-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  cursor: pointer;
+  transition: var(--transition-default);
+}
+
+.power-plan-card:hover {
+  transform: translateY(-2px);
+}
+
+.power-plan-card.active {
+  border-color: var(--accent-primary);
+  background: rgba(90, 127, 168, 0.1);
+}
+
+.plan-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(135deg, rgba(90, 127, 168, 0.1), rgba(124, 159, 194, 0.1));
+  border-radius: 12px;
+  color: var(--accent-primary);
+}
+
+.plan-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.plan-info {
+  flex: 1;
+}
+
+.plan-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.plan-status {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.active-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: var(--accent-success);
+  color: white;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .optimizer-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .ram-stats {
+    flex-direction: column;
+    text-align: center;
+  }
+}

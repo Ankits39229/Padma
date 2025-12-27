@@ -1,0 +1,157 @@
+import { contextBridge, ipcRenderer } from 'electron';
+
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
+
+interface SystemInfo {
+  memory: {
+    total: number;
+    used: number;
+    free: number;
+    usedPercent: number;
+  };
+  storage: {
+    total: number;
+    used: number;
+    free: number;
+    usedPercent: number;
+  };
+  cpu: {
+    manufacturer: string;
+    brand: string;
+    cores: number;
+    speed: number;
+  };
+  os: {
+    platform: string;
+    distro: string;
+    release: string;
+    arch: string;
+  };
+  battery: {
+    hasBattery: boolean;
+    percent: number;
+    isCharging: boolean;
+    cycleCount: number;
+    maxCapacity: number;
+    designedCapacity: number;
+  };
+}
+
+interface JunkScanResult {
+  [category: string]: {
+    size: number;
+    files: string[];
+  };
+}
+
+interface CleanResult {
+  [category: string]: {
+    success: boolean;
+    freedSpace: number;
+  };
+}
+
+interface StartupApp {
+  Name: string;
+  Command: string;
+  Location: string;
+}
+
+interface PowerPlan {
+  guid: string;
+  name: string;
+  active: boolean;
+}
+
+interface DiskItem {
+  name: string;
+  path: string;
+  size: number;
+  isDirectory: boolean;
+  children?: DiskItem[];
+}
+
+interface LargeFile {
+  name: string;
+  path: string;
+  size: number;
+}
+
+interface DiskHealth {
+  name: string;
+  type: string;
+  size: number;
+  vendor: string;
+  temperature: number | null;
+  smartStatus: string;
+}
+
+interface SystemReport {
+  success: boolean;
+  report?: any;
+  path?: string;
+  error?: string;
+}
+
+// ============================================================================
+// ELECTRON API
+// ============================================================================
+
+const electronAPI = {
+  // Window controls
+  minimizeWindow: (): void => ipcRenderer.send('window-minimize'),
+  maximizeWindow: (): void => ipcRenderer.send('window-maximize'),
+  closeWindow: (): void => ipcRenderer.send('window-close'),
+  
+  // System Information
+  getSystemInfo: (): Promise<SystemInfo | null> => 
+    ipcRenderer.invoke('get-system-info'),
+  
+  // Junk Scanner
+  scanJunk: (categories: string[]): Promise<JunkScanResult> => 
+    ipcRenderer.invoke('scan-junk', categories),
+  cleanJunk: (categories: string[]): Promise<CleanResult> => 
+    ipcRenderer.invoke('clean-junk', categories),
+  
+  // RAM Optimization
+  boostRam: (): Promise<{ success: boolean; freedMemory?: number; currentFree?: number; currentUsed?: number; error?: string }> => 
+    ipcRenderer.invoke('boost-ram'),
+  
+  // Startup Apps
+  getStartupApps: (): Promise<StartupApp[]> => 
+    ipcRenderer.invoke('get-startup-apps'),
+  toggleStartupApp: (appName: string, enabled: boolean): Promise<{ success: boolean }> => 
+    ipcRenderer.invoke('toggle-startup-app', appName, enabled),
+  
+  // Power Management
+  getPowerPlans: (): Promise<PowerPlan[]> => 
+    ipcRenderer.invoke('get-power-plans'),
+  setPowerPlan: (guid: string): Promise<{ success: boolean; error?: string }> => 
+    ipcRenderer.invoke('set-power-plan', guid),
+  
+  // Disk Analysis
+  analyzeDisk: (drivePath?: string): Promise<DiskItem | null> => 
+    ipcRenderer.invoke('analyze-disk', drivePath),
+  getLargestFiles: (drivePath?: string): Promise<LargeFile[]> => 
+    ipcRenderer.invoke('get-largest-files', drivePath),
+  getDiskHealth: (): Promise<DiskHealth[]> => 
+    ipcRenderer.invoke('get-disk-health'),
+  
+  // System Report
+  generateSystemReport: (): Promise<SystemReport> => 
+    ipcRenderer.invoke('generate-system-report'),
+  openPath: (filePath: string): Promise<{ success: boolean; error?: string }> => 
+    ipcRenderer.invoke('open-path', filePath),
+  
+  // Event Listeners
+  onQuickCleanse: (callback: () => void): void => {
+    ipcRenderer.on('trigger-quick-cleanse', callback);
+  }
+};
+
+// Expose the API to the renderer process
+contextBridge.exposeInMainWorld('electron', electronAPI);
+
+export type ElectronAPI = typeof electronAPI;
