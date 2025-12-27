@@ -34,6 +34,11 @@ export interface ElectronAPI {
   generateSystemReport: () => Promise<SystemReport>;
   openPath: (filePath: string) => Promise<{ success: boolean; error?: string }>;
   
+  // Browser Scanner (Drishti)
+  scanBrowsers: () => Promise<BrowserScanResult>;
+  cleanBrowser: (browserName: string, options: { cache: boolean, cookies: boolean, history: boolean }) => Promise<BrowserCleanResult>;
+  closeBrowser: (browserName: string) => Promise<{ success: boolean; error?: string }>;
+  
   // Event Listeners
   onQuickCleanse: (callback: () => void) => void;
 }
@@ -116,6 +121,38 @@ export interface PowerPlan {
   guid: string;
   name: string;
   active: boolean;
+}
+
+export interface BrowserInfo {
+  name: string;
+  displayName: string;
+  icon: string;
+  isInstalled: boolean;
+  isRunning: boolean;
+  processName: string;
+  paths: {
+    cache: string[];
+    cookies: string;
+    history: string;
+  };
+  analysis: {
+    cacheSize: number;
+    cookieCount: number;
+    historyCount: number;
+  };
+}
+
+export interface BrowserScanResult {
+  success: boolean;
+  browsers: BrowserInfo[];
+  error?: string;
+}
+
+export interface BrowserCleanResult {
+  success: boolean;
+  freedSpace?: number;
+  error?: string;
+  needsClose?: boolean;
 }
 
 export interface DiskItem {

@@ -168,6 +168,14 @@ const electronAPI = {
   openPath: (filePath: string): Promise<{ success: boolean; error?: string }> => 
     ipcRenderer.invoke('open-path', filePath),
   
+  // Browser Scanner (Drishti)
+  scanBrowsers: () => 
+    ipcRenderer.invoke('scan-browsers'),
+  cleanBrowser: (browserName: string, options: { cache: boolean, cookies: boolean, history: boolean }) => 
+    ipcRenderer.invoke('clean-browser', browserName, options),
+  closeBrowser: (browserName: string) => 
+    ipcRenderer.invoke('close-browser', browserName),
+  
   // Event Listeners
   onQuickCleanse: (callback: () => void): void => {
     ipcRenderer.on('trigger-quick-cleanse', callback);

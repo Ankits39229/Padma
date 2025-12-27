@@ -47,7 +47,7 @@ export class DrishtiPanel extends BasePanel {
               </span>
               Drishti
             </h1>
-            <p class="panel-subtitle">System Analyzer - Deep insights into your storage and system health</p>
+            <p class="panel-subtitle">System Analyzer - Storage insights and system health</p>
           </div>
         </div>
 
@@ -516,13 +516,15 @@ export class DrishtiPanel extends BasePanel {
     try {
       const result = await window.electron.generateSystemReport();
       
-      if (result.success && result.path) {
-        Toast.success('Report generated successfully!');
+      if (result.success) {
+        Toast.success(`Report saved to ${result.path}`);
         
         // Ask to open the report
-        const openReport = confirm('Report saved! Would you like to open it?');
-        if (openReport) {
-          await window.electron.openPath(result.path);
+        if (result.path) {
+          const openReport = confirm('Report saved! Would you like to open it?');
+          if (openReport) {
+            await window.electron.openPath(result.path);
+          }
         }
       } else {
         Toast.error('Failed to generate report');

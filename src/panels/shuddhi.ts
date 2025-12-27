@@ -1,7 +1,7 @@
 // Shuddhi Panel - System Cleaner with categorized junk scanning
 import { BasePanel } from './BasePanel.js';
 import { Toast } from '../components/toast.js';
-import { JunkScanResult } from '../types/electron.d.js';
+import { JunkScanResult, BrowserInfo } from '../types/electron.d.js';
 
 interface CleaningCategory {
   id: string;
@@ -15,6 +15,7 @@ interface CleaningCategory {
 
 export class ShuddhiPanel extends BasePanel {
   private categories: CleaningCategory[] = [];
+  private browsers: BrowserInfo[] = [];
   private isScanning: boolean = false;
   private isCleaning: boolean = false;
   private totalJunkFound: number = 0;
@@ -25,6 +26,7 @@ export class ShuddhiPanel extends BasePanel {
 
   protected init(): void {
     this.initializeCategories();
+    this.scanBrowsers(); // Auto-scan browsers on init
     super.init();
   }
 
@@ -194,6 +196,23 @@ export class ShuddhiPanel extends BasePanel {
           <div class="progress-text" id="progress-text">Scanning...</div>
         </div>
 
+        <!-- Browser Cleaner Card -->
+        <div class="browser-cleaner-section">
+          <h2 class="section-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <circle cx="12" cy="12" r="6"/>
+              <circle cx="12" cy="12" r="2"/>
+            </svg>
+            Browser Cleaner
+          </h2>
+          <div class="browser-grid" id="browser-grid">
+            <div class="loading-state">
+              <span>Scanning for installed browsers...</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Categories Grid -->
         <div class="categories-section">
           <h2 class="section-title">Cleaning Categories</h2>
@@ -257,6 +276,31 @@ export class ShuddhiPanel extends BasePanel {
         cat.enabled = target.checked;
       });
     });
+
+    // Browser cleaning buttons
+    this.container?.addEventListener('click', async (e) => {
+      const target = e.target as HTMLElement;
+      
+      // Clean browser button
+      const cleanBtn = target.closest('.clean-browser-btn') as HTMLElement;
+      if (cleanBtn) {
+        const browserName = cleanBtn.dataset.browser;
+        if (browserName) {
+          await this.cleanBrowserCache(browserName);
+        }
+        return;
+      }
+
+      // Close browser button
+      const closeBtn = target.closest('.close-browser-btn') as HTMLElement;
+      if (closeBtn) {
+        const browserName = closeBtn.dataset.browser;
+        if (browserName) {
+          await this.closeBrowserProcess(browserName);
+        }
+        return;
+      }
+    });
   }
 
   public triggerQuickScan(): void {
@@ -290,17 +334,13 @@ export class ShuddhiPanel extends BasePanel {
     if (scanResult) scanResult.style.display = 'none';
 
     try {
-      // Always use hardcoded list to ensure all categories are scanned
-      const ALL_CATEGORIES = ['temp', 'prefetch', 'logs', 'recycle', 'browser-chrome', 'browser-edge', 'browser-firefox'];
+      // Rescan browsers first to get latest browser list
+      await this.scanBrowsers();
       
-      // Reinitialize categories if needed
-      if (this.categories.length !== 7) {
-        console.log(`[Shuddhi] WARNING: Categories array has ${this.categories.length} items, expected 7. Reinitializing...`);
-        this.initializeCategories();
-      }
+      // Get all category IDs (including dynamic browsers)
+      const ALL_CATEGORIES = this.categories.map(c => c.id);
       
-      console.log('[Shuddhi] Starting scan with ALL_CATEGORIES:', ALL_CATEGORIES);
-      console.log('[Shuddhi] this.categories has:', this.categories.map(c => c.id));
+      console.log('[Shuddhi] Starting scan with categories:', ALL_CATEGORIES);
       let scanned = 0;
       
       // Store all results
@@ -442,14 +482,46 @@ export class ShuddhiPanel extends BasePanel {
           progressText.textContent = `Cleaning ${cat?.name || catId}...`;
         }
 
-        const result = await window.electron.cleanJunk([catId]);
-        
-        if (result[catId]?.success) {
-          totalFreed += result[catId].freedSpace;
-          const category = this.categories.find(c => c.id === catId);
-          if (category) {
-            category.size = 0;
-            category.files = [];
+        // Check if this is a browser category
+        if (catId.startsWith('browser-')) {
+          const browserName = catId.replace('browser-', '');
+          const browser = this.browsers.find(b => b.name === browserName);
+          
+          if (browser && browser.isRunning) {
+            // Close the browser first
+            if (progressText) {
+              progressText.textContent = `Closing ${browser.displayName}...`;
+            }
+            await window.electron.closeBrowser(browserName);
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for full shutdown
+          }
+          
+          // Clean browser cache
+          const browserResult = await window.electron.cleanBrowser(browserName, {
+            cache: true,
+            cookies: false,
+            history: false
+          });
+          
+          if (browserResult.success) {
+            totalFreed += browserResult.freedSpace || 0;
+            const category = this.categories.find(c => c.id === catId);
+            if (category) {
+              category.size = 0;
+              category.files = [];
+            }
+          }
+        } else {
+          // Regular junk cleaning
+          const result = await window.electron.cleanJunk([catId]);
+          
+          if (result[catId]?.success) {
+            totalFreed += result[catId].freedSpace;
+            const category = this.categories.find(c => c.id === catId);
+            if (category) {
+              category.size = 0;
+              category.files = [];
+            }
           }
         }
 
@@ -487,4 +559,203 @@ export class ShuddhiPanel extends BasePanel {
       if (progressContainer) progressContainer.style.display = 'none';
     }
   }
+
+  private async scanBrowsers(): Promise<void> {
+    try {
+      const result = await window.electron.scanBrowsers();
+      
+      if (result.success && result.browsers.length > 0) {
+        this.browsers = result.browsers;
+        this.updateBrowserGrid();
+        
+        // Remove old browser categories
+        this.categories = this.categories.filter(c => !c.id.startsWith('browser-'));
+        
+        // Add detected browsers as categories
+        for (const browser of this.browsers) {
+          const category: CleaningCategory = {
+            id: `browser-${browser.name}`,
+            name: `${browser.displayName}${browser.isRunning ? ' ⚠️' : ''}`,
+            description: browser.isRunning ? `${browser.displayName} (Running - will be closed)` : `${browser.displayName} browser cache`,
+            icon: this.getBrowserIcon(browser.name),
+            enabled: false,
+            size: browser.analysis.cacheSize,
+            files: []
+          };
+          this.categories.push(category);
+        }
+        
+        // Categories updated, will be rendered on next scan
+      }
+    } catch (error) {
+      console.error('Failed to scan browsers:', error);
+    }
+  }
+
+  private updateBrowserGrid(): void {
+    const grid = this.getElement('#browser-grid');
+    if (!grid) return;
+
+    if (this.browsers.length === 0) {
+      grid.innerHTML = `
+        <div class="no-browsers-found">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="15" y1="9" x2="9" y2="15"/>
+            <line x1="9" y1="9" x2="15" y2="15"/>
+          </svg>
+          <p>No browsers detected</p>
+        </div>
+      `;
+      return;
+    }
+
+    grid.innerHTML = this.browsers.map(browser => {
+      const cacheSizeMB = (browser.analysis.cacheSize / (1024 * 1024)).toFixed(1);
+      const statusClass = browser.isRunning ? 'status-running' : 'status-ready';
+      const statusText = browser.isRunning ? 'Running' : 'Ready to Clean';
+
+      return `
+        <div class="glass-card browser-card" data-browser="${browser.name}">
+          <div class="browser-header">
+            <div class="browser-icon ${browser.icon}">
+              ${this.getBrowserIcon(browser.name)}
+            </div>
+            <div class="browser-info">
+              <h3>${browser.displayName}</h3>
+              <span class="browser-status ${statusClass}">${statusText}</span>
+            </div>
+          </div>
+          
+          <div class="browser-stats">
+            <div class="stat-item">
+              <span class="stat-label">Cache</span>
+              <span class="stat-value">${cacheSizeMB} MB</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Cookies</span>
+              <span class="stat-value">${browser.analysis.cookieCount}</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">History</span>
+              <span class="stat-value">${browser.analysis.historyCount}</span>
+            </div>
+          </div>
+
+          <div class="browser-actions">
+            ${browser.isRunning ? `
+              <button class="btn-secondary close-browser-btn" data-browser="${browser.name}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+                Close Browser
+              </button>
+            ` : `
+              <button class="btn-primary clean-browser-btn" data-browser="${browser.name}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 6h18"/>
+                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                  <line x1="10" y1="11" x2="10" y2="17"/>
+                  <line x1="14" y1="11" x2="14" y2="17"/>
+                </svg>
+                Clean Cache
+              </button>
+            `}
+          </div>
+
+          <div class="browser-note">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="16" x2="12" y2="12"/>
+              <line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+            <span>Cache only • Cookies & History preserved</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  private async cleanBrowserCache(browserName: string): Promise<void> {
+    const browser = this.browsers.find(b => b.name === browserName);
+    if (!browser) return;
+
+    if (browser.isRunning) {
+      const confirmed = confirm(`${browser.displayName} is currently running. Would you like to close it and continue cleaning?`);
+      if (confirmed) {
+        await this.closeBrowserProcess(browserName);
+        // Wait for process to fully terminate
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } else {
+        return;
+      }
+    }
+
+    try {
+      const result = await window.electron.cleanBrowser(browserName, {
+        cache: true,
+        cookies: false,
+        history: false
+      });
+
+      if (result.success) {
+        const freedMB = ((result.freedSpace || 0) / (1024 * 1024)).toFixed(1);
+        Toast.success(`Cleaned ${browser.displayName}: ${freedMB} MB freed`);
+        // Rescan to update the UI
+        await this.scanBrowsers();
+      } else if (result.needsClose) {
+        Toast.warning(result.error || 'Browser needs to be closed first');
+      } else {
+        Toast.error(result.error || 'Failed to clean browser');
+      }
+    } catch (error) {
+      Toast.error(`Error cleaning ${browser.displayName}`);
+      console.error(error);
+    }
+  }
+
+  private async closeBrowserProcess(browserName: string): Promise<void> {
+    const browser = this.browsers.find(b => b.name === browserName);
+    if (!browser) return;
+
+    try {
+      const result = await window.electron.closeBrowser(browserName);
+      
+      if (result.success) {
+        Toast.success(`${browser.displayName} closed`);
+        browser.isRunning = false;
+        this.updateBrowserGrid();
+        await this.scanBrowsers();
+      } else {
+        Toast.error(result.error || 'Failed to close browser');
+      }
+    } catch (error) {
+      Toast.error(`Error closing ${browser.displayName}`);
+      console.error(error);
+    }
+  }
+
+  private getBrowserIcon(name: string): string {
+    const icons: Record<string, string> = {
+      chrome: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <circle cx="12" cy="12" r="4"/>
+        <line x1="21.17" y1="8" x2="12" y2="8"/>
+      </svg>`,
+      edge: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+      </svg>`,
+      firefox: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 2a10 10 0 0 0-7 17"/>
+      </svg>`,
+      brave: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2l10 5v5c0 6-4 10-10 14-6-4-10-8-10-14V7z"/>
+      </svg>`
+    };
+    return icons[name] || icons.chrome;
+  }
 }
+

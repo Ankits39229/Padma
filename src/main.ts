@@ -1293,6 +1293,292 @@ ipcMain.handle('open-path', async (_, filePath: string) => {
 });
 
 // ============================================================================
+// BROWSER SCANNER - DRISHTI MODULE
+// ============================================================================
+
+interface BrowserInfo {
+  name: string;
+  displayName: string;
+  icon: string;
+  isInstalled: boolean;
+  isRunning: boolean;
+  processName: string;
+  paths: {
+    cache: string[];
+    cookies: string;
+    history: string;
+  };
+  analysis: {
+    cacheSize: number;
+    cookieCount: number;
+    historyCount: number;
+  };
+}
+
+/**
+ * Discover installed browsers by checking registry and file paths
+ */
+async function discoverBrowsers(): Promise<BrowserInfo[]> {
+  const browsers: BrowserInfo[] = [
+    {
+      name: 'chrome',
+      displayName: 'Google Chrome',
+      icon: 'chrome',
+      isInstalled: false,
+      isRunning: false,
+      processName: 'chrome.exe',
+      paths: {
+        cache: [
+          path.join(os.homedir(), 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Cache'),
+          path.join(os.homedir(), 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Code Cache'),
+          path.join(os.homedir(), 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'GPUCache')
+        ],
+        cookies: path.join(os.homedir(), 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Network', 'Cookies'),
+        history: path.join(os.homedir(), 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'History')
+      },
+      analysis: { cacheSize: 0, cookieCount: 0, historyCount: 0 }
+    },
+    {
+      name: 'edge',
+      displayName: 'Microsoft Edge',
+      icon: 'edge',
+      isInstalled: false,
+      isRunning: false,
+      processName: 'msedge.exe',
+      paths: {
+        cache: [
+          path.join(os.homedir(), 'AppData', 'Local', 'Microsoft', 'Edge', 'User Data', 'Default', 'Cache'),
+          path.join(os.homedir(), 'AppData', 'Local', 'Microsoft', 'Edge', 'User Data', 'Default', 'Code Cache'),
+          path.join(os.homedir(), 'AppData', 'Local', 'Microsoft', 'Edge', 'User Data', 'Default', 'GPUCache')
+        ],
+        cookies: path.join(os.homedir(), 'AppData', 'Local', 'Microsoft', 'Edge', 'User Data', 'Default', 'Network', 'Cookies'),
+        history: path.join(os.homedir(), 'AppData', 'Local', 'Microsoft', 'Edge', 'User Data', 'Default', 'History')
+      },
+      analysis: { cacheSize: 0, cookieCount: 0, historyCount: 0 }
+    },
+    {
+      name: 'firefox',
+      displayName: 'Mozilla Firefox',
+      icon: 'firefox',
+      isInstalled: false,
+      isRunning: false,
+      processName: 'firefox.exe',
+      paths: {
+        cache: [],
+        cookies: '',
+        history: ''
+      },
+      analysis: { cacheSize: 0, cookieCount: 0, historyCount: 0 }
+    },
+    {
+      name: 'brave',
+      displayName: 'Brave Browser',
+      icon: 'brave',
+      isInstalled: false,
+      isRunning: false,
+      processName: 'brave.exe',
+      paths: {
+        cache: [
+          path.join(os.homedir(), 'AppData', 'Local', 'BraveSoftware', 'Brave-Browser', 'User Data', 'Default', 'Cache'),
+          path.join(os.homedir(), 'AppData', 'Local', 'BraveSoftware', 'Brave-Browser', 'User Data', 'Default', 'Code Cache'),
+          path.join(os.homedir(), 'AppData', 'Local', 'BraveSoftware', 'Brave-Browser', 'User Data', 'Default', 'GPUCache')
+        ],
+        cookies: path.join(os.homedir(), 'AppData', 'Local', 'BraveSoftware', 'Brave-Browser', 'User Data', 'Default', 'Network', 'Cookies'),
+        history: path.join(os.homedir(), 'AppData', 'Local', 'BraveSoftware', 'Brave-Browser', 'User Data', 'Default', 'History')
+      },
+      analysis: { cacheSize: 0, cookieCount: 0, historyCount: 0 }
+    }
+  ];
+
+  // Check for Firefox profiles (they use random names like x8y9z.default)
+  const firefoxProfilesDir = path.join(os.homedir(), 'AppData', 'Local', 'Mozilla', 'Firefox', 'Profiles');
+  if (fs.existsSync(firefoxProfilesDir)) {
+    const profiles = fs.readdirSync(firefoxProfilesDir);
+    const defaultProfile = profiles.find(p => p.includes('.default') || p.includes('-release'));
+    if (defaultProfile) {
+      const firefoxBrowser = browsers.find(b => b.name === 'firefox')!;
+      firefoxBrowser.paths.cache = [path.join(firefoxProfilesDir, defaultProfile, 'cache2', 'entries')];
+      firefoxBrowser.paths.cookies = path.join(firefoxProfilesDir, defaultProfile, 'cookies.sqlite');
+      firefoxBrowser.paths.history = path.join(firefoxProfilesDir, defaultProfile, 'places.sqlite');
+    }
+  }
+
+  // Check which browsers are installed
+  for (const browser of browsers) {
+    // Check if any of the browser paths exist
+    const cacheExists = browser.paths.cache.some(p => fs.existsSync(p));
+    const cookiesExist = !!(browser.paths.cookies && fs.existsSync(browser.paths.cookies));
+    const historyExists = !!(browser.paths.history && fs.existsSync(browser.paths.history));
+    
+    browser.isInstalled = cacheExists || cookiesExist || historyExists;
+    
+    // Debug logging
+    if (browser.name === 'brave') {
+      console.log('Brave detection:', {
+        cacheExists,
+        cookiesExist,
+        historyExists,
+        isInstalled: browser.isInstalled,
+        cachePaths: browser.paths.cache,
+        cookiesPath: browser.paths.cookies
+      });
+    }
+  }
+
+  // Check which browsers are running
+  try {
+    const { stdout } = await execAsync('tasklist');
+    for (const browser of browsers) {
+      browser.isRunning = stdout.toLowerCase().includes(browser.processName.toLowerCase());
+    }
+  } catch (error) {
+    console.error('Failed to check running processes:', error);
+  }
+
+  return browsers.filter(b => b.isInstalled);
+}
+
+/**
+ * Analyze browser data sizes and counts
+ */
+async function analyzeBrowser(browser: BrowserInfo): Promise<BrowserInfo> {
+  try {
+    // Calculate cache size
+    let totalCacheSize = 0;
+    for (const cachePath of browser.paths.cache) {
+      if (fs.existsSync(cachePath)) {
+        const size = await safeGetSize(cachePath);
+        totalCacheSize += size;
+      }
+    }
+    browser.analysis.cacheSize = totalCacheSize;
+
+    // Count cookies and history using PowerShell with better-sqlite3 (if available)
+    // For simplicity, we'll use file size as an estimate
+    if (browser.paths.cookies && fs.existsSync(browser.paths.cookies)) {
+      try {
+        const stats = fs.statSync(browser.paths.cookies);
+        // Rough estimate: 1 cookie ≈ 200 bytes
+        browser.analysis.cookieCount = Math.floor(stats.size / 200);
+      } catch {}
+    }
+
+    if (browser.paths.history && fs.existsSync(browser.paths.history)) {
+      try {
+        const stats = fs.statSync(browser.paths.history);
+        // Rough estimate: 1 history entry ≈ 400 bytes
+        browser.analysis.historyCount = Math.floor(stats.size / 400);
+      } catch {}
+    }
+
+  } catch (error) {
+    console.error(`Failed to analyze ${browser.displayName}:`, error);
+  }
+
+  return browser;
+}
+
+/**
+ * Scan all installed browsers
+ */
+ipcMain.handle('scan-browsers', async () => {
+  try {
+    const browsers = await discoverBrowsers();
+    
+    // Analyze each browser in parallel
+    const analyzed = await Promise.all(
+      browsers.map(browser => analyzeBrowser(browser))
+    );
+
+    return { success: true, browsers: analyzed };
+  } catch (error) {
+    console.error('Browser scan error:', error);
+    return { success: false, error: String(error), browsers: [] };
+  }
+});
+
+/**
+ * Clean specific browser data
+ */
+ipcMain.handle('clean-browser', async (_, browserName: string, options: { cache: boolean, cookies: boolean, history: boolean }) => {
+  try {
+    const browsers = await discoverBrowsers();
+    const browser = browsers.find(b => b.name === browserName);
+    
+    if (!browser) {
+      return { success: false, error: 'Browser not found' };
+    }
+
+    // Check if browser is running
+    if (browser.isRunning) {
+      return { success: false, error: `${browser.displayName} is running. Please close it first.`, needsClose: true };
+    }
+
+    let totalFreed = 0;
+
+    // Clean cache
+    if (options.cache) {
+      for (const cachePath of browser.paths.cache) {
+        if (fs.existsSync(cachePath)) {
+          const size = await safeGetSize(cachePath);
+          await deleteFilesInDirectory(cachePath);
+          totalFreed += size;
+        }
+      }
+    }
+
+    // Clean cookies
+    if (options.cookies && browser.paths.cookies && fs.existsSync(browser.paths.cookies)) {
+      try {
+        const size = fs.statSync(browser.paths.cookies).size;
+        fs.unlinkSync(browser.paths.cookies);
+        totalFreed += size;
+      } catch {}
+    }
+
+    // Clean history
+    if (options.history && browser.paths.history && fs.existsSync(browser.paths.history)) {
+      try {
+        const size = fs.statSync(browser.paths.history).size;
+        fs.unlinkSync(browser.paths.history);
+        totalFreed += size;
+      } catch {}
+    }
+
+    return { success: true, freedSpace: totalFreed };
+  } catch (error) {
+    console.error('Browser clean error:', error);
+    return { success: false, error: String(error) };
+  }
+});
+
+/**
+ * Force close browser process
+ */
+ipcMain.handle('close-browser', async (_, browserName: string) => {
+  try {
+    const browsers = await discoverBrowsers();
+    const browser = browsers.find(b => b.name === browserName);
+    
+    if (!browser) {
+      return { success: false, error: 'Browser not found' };
+    }
+
+    try {
+      await execAsync(`taskkill /IM ${browser.processName} /F`);
+      // Wait a moment for process to fully terminate
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return { success: true };
+    } catch (error) {
+      // Process might already be closed
+      return { success: true };
+    }
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+});
+
+// ============================================================================
 // APP LIFECYCLE
 // ============================================================================
 
