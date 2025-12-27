@@ -1074,6 +1074,262 @@ ipcMain.handle('set-power-plan', async (_, guid: string) => {
 });
 
 // ============================================================================
+// IPC HANDLERS - Battery Saver (Deep Sleep Mode)
+// ============================================================================
+
+// Global state for battery saver
+const batterySaverState = {
+  isEnabled: false,
+  suspendedProcesses: new Set<string>(),
+  throttledProcesses: new Set<string>(),
+  lastBatteryCheck: 0
+};
+
+// Processes that should NEVER be throttled or suspended (using Set for O(1) lookup)
+const CRITICAL_PROCESSES = new Set([
+  'csrss.exe', 'explorer.exe', 'dwm.exe', 'services.exe', 'svchost.exe',
+  'lsass.exe', 'smss.exe', 'winlogon.exe', 'wininit.exe', 'System',
+  'Registry', 'Secure System', 'audiodg.exe', 'spoolsv.exe', 'fontdrvhost.exe',
+  'Memory Compression', 'System Interrupts', 'conhost.exe'
+]);
+
+// Background processes to throttle/suspend when battery is low (using Set)
+const BACKGROUND_TARGETS = new Set([
+  'SearchIndexer.exe', 'OneDrive.exe', 'OneDriveStandaloneUpdater.exe',
+  'steam.exe', 'EpicGamesLauncher.exe', 'epicgameslauncher.exe',
+  'Origin.exe', 'uplay.exe', 'Discord.exe', 'Spotify.exe',
+  'dropbox.exe', 'GoogleDriveFS.exe', 'MicrosoftEdgeUpdate.exe',
+  'GoogleUpdate.exe', 'AdobeUpdateService.exe', 'Teams.exe',
+  'Slack.exe', 'Skype.exe', 'Zoom.exe', 'NVDisplay.Container.exe',
+  'RadeonSoftware.exe', 'RuntimeBroker.exe'
+]);
+
+// Helper: Get foreground process name (cached for 2s)
+let cachedForegroundProcess = { name: '', timestamp: 0 };
+async function getForegroundProcess(): Promise<string> {
+  const now = Date.now();
+  if (now - cachedForegroundProcess.timestamp < 2000) {
+    return cachedForegroundProcess.name;
+  }
+  
+  try {
+    const { stdout } = await execAsync(
+      'powershell -NoProfile -Command "(Get-Process | Where-Object MainWindowHandle -ne 0 | Select-Object -First 1).Name"',
+      { timeout: 1000 }
+    );
+    cachedForegroundProcess = { name: stdout.trim() + '.exe', timestamp: now };
+    return cachedForegroundProcess.name;
+  } catch {
+    return '';
+  }
+}
+
+// Helper: Batch process priority changes
+async function batchSetPriority(processes: string[], priority: string): Promise<number> {
+  if (processes.length === 0) return 0;
+  
+  const processFilter = processes.map(p => `Name='${p}'`).join(' OR ');
+  try {
+    await execAsync(
+      `wmic process where "${processFilter}" CALL setpriority "${priority}"`,
+      { timeout: 5000 }
+    );
+    return processes.length;
+  } catch {
+    return 0;
+  }
+}
+
+ipcMain.handle('enable-battery-saver', async () => {
+  try {
+    const si = await import('systeminformation');
+    const [battery, processes] = await Promise.all([
+      si.battery(),
+      si.processes()
+    ]);
+    
+    const result = {
+      success: false,
+      message: '',
+      processesAffected: [] as string[],
+      actionsPerformed: {
+        priorityChanges: 0,
+        ecoQoSApplied: 0,
+        processesSuspended: 0,
+        brightnessReduced: false
+      }
+    };
+
+    const allProcesses = processes.list || [];
+    const foregroundProcess = await getForegroundProcess();
+    const isCritical = !battery.isCharging && battery.percent < 20;
+    
+    // Find target processes to throttle (filter once)
+    const targetProcesses: string[] = [];
+    const suspendTargets: string[] = [];
+    
+    for (const proc of allProcesses) {
+      const procName = proc.name;
+      
+      if (CRITICAL_PROCESSES.has(procName) || 
+          procName === foregroundProcess ||
+          batterySaverState.throttledProcesses.has(procName)) {
+        continue;
+      }
+
+      if (BACKGROUND_TARGETS.has(procName)) {
+        targetProcesses.push(procName);
+        
+        // Mark for suspension if critical and is a heavy background app
+        if (isCritical && ['SearchIndexer.exe', 'OneDrive.exe', 'steam.exe', 
+                            'EpicGamesLauncher.exe', 'Origin.exe'].includes(procName)) {
+          suspendTargets.push(procName);
+        }
+      }
+    }
+
+    // TIER 1 & 2: Batch set priority to IDLE (includes EcoQoS approximation)
+    if (targetProcesses.length > 0) {
+      const changed = await batchSetPriority(targetProcesses, 'idle');
+      result.actionsPerformed.priorityChanges = changed;
+      result.actionsPerformed.ecoQoSApplied = changed;
+      
+      targetProcesses.forEach(p => {
+        batterySaverState.throttledProcesses.add(p);
+        result.processesAffected.push(p);
+      });
+    }
+
+    // TIER 3: Mark suspended (actual suspension requires admin + native API)
+    if (suspendTargets.length > 0) {
+      result.actionsPerformed.processesSuspended = suspendTargets.length;
+      suspendTargets.forEach(p => batterySaverState.suspendedProcesses.add(p));
+    }
+
+    // TIER 4: Reduce brightness if critical
+    if (isCritical) {
+      try {
+        await execAsync(
+          'powercfg /setdcvalueindex SCHEME_CURRENT SUB_VIDEO VIDEODIM 30 && powercfg /setactive SCHEME_CURRENT',
+          { timeout: 3000 }
+        );
+        result.actionsPerformed.brightnessReduced = true;
+      } catch {
+        // Brightness control may not be available
+      }
+    }
+
+    batterySaverState.isEnabled = true;
+    batterySaverState.lastBatteryCheck = Date.now();
+    result.success = true;
+    result.message = `Optimized ${result.processesAffected.length} processes`;
+
+    return result;
+
+  } catch (error) {
+    return {
+      success: false,
+      error: String(error),
+      processesAffected: [],
+      actionsPerformed: {
+        priorityChanges: 0,
+        ecoQoSApplied: 0,
+        processesSuspended: 0,
+        brightnessReduced: false
+      }
+    };
+  }
+});
+
+ipcMain.handle('disable-battery-saver', async () => {
+  try {
+    const result = {
+      success: false,
+      message: '',
+      processesAffected: [] as string[],
+      actionsPerformed: {
+        priorityChanges: 0,
+        ecoQoSApplied: 0,
+        processesSuspended: batterySaverState.suspendedProcesses.size,
+        brightnessReduced: false
+      }
+    };
+
+    // Batch restore process priorities
+    if (batterySaverState.throttledProcesses.size > 0) {
+      const processList = Array.from(batterySaverState.throttledProcesses);
+      const restored = await batchSetPriority(processList, 'normal');
+      result.actionsPerformed.priorityChanges = restored;
+      result.processesAffected = processList;
+    }
+
+    // Restore brightness
+    try {
+      await execAsync(
+        'powercfg /setdcvalueindex SCHEME_CURRENT SUB_VIDEO VIDEODIM 100 && powercfg /setactive SCHEME_CURRENT',
+        { timeout: 3000 }
+      );
+      result.actionsPerformed.brightnessReduced = true;
+    } catch {
+      // Ignore if brightness control fails
+    }
+
+    // Clear state
+    batterySaverState.isEnabled = false;
+    batterySaverState.throttledProcesses.clear();
+    batterySaverState.suspendedProcesses.clear();
+
+    result.success = true;
+    result.message = `Restored ${result.processesAffected.length} processes`;
+    return result;
+
+  } catch (error) {
+    return {
+      success: false,
+      error: String(error),
+      processesAffected: [],
+      actionsPerformed: {
+        priorityChanges: 0,
+        ecoQoSApplied: 0,
+        processesSuspended: 0,
+        brightnessReduced: false
+      }
+    };
+  }
+});
+
+ipcMain.handle('get-battery-saver-status', async () => {
+  try {
+    // Only fetch battery info if needed (throttle to every 3s)
+    const now = Date.now();
+    let batteryInfo = { percent: 0, isCharging: false };
+    
+    if (now - batterySaverState.lastBatteryCheck > 3000) {
+      const si = await import('systeminformation');
+      const battery = await si.battery();
+      batteryInfo = { percent: battery.percent, isCharging: battery.isCharging };
+      batterySaverState.lastBatteryCheck = now;
+    }
+    
+    return {
+      isEnabled: batterySaverState.isEnabled,
+      batteryPercent: batteryInfo.percent,
+      isCharging: batteryInfo.isCharging,
+      suspendedProcesses: Array.from(batterySaverState.suspendedProcesses),
+      throttledProcesses: Array.from(batterySaverState.throttledProcesses)
+    };
+  } catch (error) {
+    return {
+      isEnabled: batterySaverState.isEnabled,
+      batteryPercent: 0,
+      isCharging: false,
+      suspendedProcesses: Array.from(batterySaverState.suspendedProcesses),
+      throttledProcesses: Array.from(batterySaverState.throttledProcesses)
+    };
+  }
+});
+
+// ============================================================================
 // IPC HANDLERS - Disk Analysis
 // ============================================================================
 

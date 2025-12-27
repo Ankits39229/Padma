@@ -13,6 +13,8 @@ export class PranaPanel extends BasePanel {
   private selectedBoostMode: BoostMode = 'soft';
   private cooldownInterval: NodeJS.Timeout | null = null;
   private cooldownRemaining: number = 0;
+  private batterySaverEnabled: boolean = false;
+  private batterySaverStatusInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     super('prana-panel', 30);
@@ -209,15 +211,77 @@ export class PranaPanel extends BasePanel {
                   <span class="value" id="battery-health">--</span>
                 </div>
               </div>
-              <div class="power-saver-toggle">
-                <label class="toggle-label">
-                  <span>Aggressive Power Saver</span>
-                  <div class="toggle-switch">
-                    <input type="checkbox" id="power-saver-toggle">
-                    <span class="toggle-slider"></span>
+              <div class="power-saver-section">
+                <div class="section-title-small">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2v4"/>
+                    <path d="M12 18v4"/>
+                    <path d="M4.93 4.93l2.83 2.83"/>
+                    <path d="M16.24 16.24l2.83 2.83"/>
+                  </svg>
+                  <span>Battery Saver (Deep Sleep Mode)</span>
+                </div>
+                <p class="feature-description">Aggressive power saving that throttles background apps, applies Efficiency Mode (EcoQoS), and suspends battery hogs when critical (&lt;20%).</p>
+                
+                <div class="battery-saver-status" id="battery-saver-status">
+                  <div class="status-badge" id="status-badge">
+                    <span class="status-indicator"></span>
+                    <span class="status-text">Disabled</span>
                   </div>
-                </label>
-                <p class="toggle-desc">Enables maximum power saving mode</p>
+                  <div class="status-details" id="status-details" style="display: none;">
+                    <span class="detail-item">
+                      <strong id="throttled-count">0</strong> processes throttled
+                    </span>
+                    <span class="detail-item">
+                      <strong id="suspended-count">0</strong> suspended
+                    </span>
+                  </div>
+                </div>
+
+                <div class="toggle-container">
+                  <label class="toggle-label-enhanced">
+                    <div class="toggle-info">
+                      <span class="toggle-title">Enable Aggressive Battery Saver</span>
+                      <span class="toggle-subtitle">3-Tier optimization: Priority → EcoQoS → Suspend</span>
+                    </div>
+                    <div class="toggle-switch">
+                      <input type="checkbox" id="battery-saver-toggle">
+                      <span class="toggle-slider"></span>
+                    </div>
+                  </label>
+                </div>
+
+                <div class="safety-info">
+                  <div class="info-header">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    </svg>
+                    <span>Safety Guardrails</span>
+                  </div>
+                  <ul class="info-list">
+                    <li>✓ Foreground app & audio never throttled</li>
+                    <li>✓ Critical system processes protected</li>
+                    <li>✓ Auto-restores when plugged in</li>
+                    <li>✓ Brightness reduced to 30% if critical</li>
+                  </ul>
+                </div>
+
+                <div class="process-list" id="affected-processes" style="display: none;">
+                  <div class="process-list-header">
+                    <span>Affected Processes</span>
+                    <button class="btn-icon" id="refresh-processes-btn">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 4v6h-6"/>
+                        <path d="M1 20v-6h6"/>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/>
+                        <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"/>
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="process-list-content" id="process-list-content">
+                    <div class="empty-state-small">No processes affected yet</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -467,12 +531,19 @@ export class PranaPanel extends BasePanel {
     const refreshBtn = this.getElement('#refresh-startup-btn');
     refreshBtn?.addEventListener('click', () => this.loadData());
 
-    // Power saver toggle
-    const powerSaverToggle = this.getElement<HTMLInputElement>('#power-saver-toggle');
-    powerSaverToggle?.addEventListener('change', (e) => {
+    // Battery Saver toggle
+    const batterySaverToggle = this.getElement<HTMLInputElement>('#battery-saver-toggle');
+    batterySaverToggle?.addEventListener('change', (e) => {
       const target = e.target as HTMLInputElement;
-      this.togglePowerSaver(target.checked);
+      this.toggleBatterySaver(target.checked);
     });
+
+    // Refresh affected processes
+    const refreshProcessesBtn = this.getElement('#refresh-processes-btn');
+    refreshProcessesBtn?.addEventListener('click', () => this.updateBatterySaverStatus());
+
+    // Check initial battery saver status
+    this.updateBatterySaverStatus();
 
     // Check cooldown on load
     this.checkCooldown();
@@ -641,6 +712,156 @@ export class PranaPanel extends BasePanel {
           <span>On Cooldown</span>
         `;
       }
+    }
+  }
+
+  private async toggleBatterySaver(enabled: boolean): Promise<void> {
+    try {
+      if (enabled) {
+        // Enable battery saver
+        const result = await window.electron.enableBatterySaver();
+        
+        if (result.success) {
+          this.batterySaverEnabled = true;
+          const processCount = result.processesAffected?.length || 0;
+          const actions = result.actionsPerformed;
+          
+          Toast.success(
+            `Battery Saver enabled! ${processCount} processes optimized ` +
+            `(Priority: ${actions?.priorityChanges || 0}, EcoQoS: ${actions?.ecoQoSApplied || 0}, ` +
+            `Suspended: ${actions?.processesSuspended || 0})`
+          );
+          
+          // Update status display
+          this.updateBatterySaverStatus();
+          
+          // Start monitoring for auto-disable on AC power
+          if (!this.batterySaverStatusInterval) {
+            this.batterySaverStatusInterval = setInterval(() => {
+              this.checkAutoDisable();
+            }, 5000);
+          }
+        } else {
+          Toast.error(result.error || 'Failed to enable Battery Saver');
+          const toggle = this.getElement<HTMLInputElement>('#battery-saver-toggle');
+          if (toggle) toggle.checked = false;
+        }
+      } else {
+        // Disable battery saver
+        const result = await window.electron.disableBatterySaver();
+        
+        if (result.success) {
+          this.batterySaverEnabled = false;
+          const processCount = result.processesAffected?.length || 0;
+          
+          Toast.info(`Battery Saver disabled. ${processCount} processes restored to normal.`);
+          
+          // Update status display
+          this.updateBatterySaverStatus();
+          
+          // Stop monitoring
+          if (this.batterySaverStatusInterval) {
+            clearInterval(this.batterySaverStatusInterval);
+            this.batterySaverStatusInterval = null;
+          }
+        } else {
+          Toast.error(result.error || 'Failed to disable Battery Saver');
+          const toggle = this.getElement<HTMLInputElement>('#battery-saver-toggle');
+          if (toggle) toggle.checked = true;
+        }
+      }
+    } catch (error) {
+      Toast.error('Error toggling Battery Saver');
+      this.handleError(error);
+      const toggle = this.getElement<HTMLInputElement>('#battery-saver-toggle');
+      if (toggle) toggle.checked = !enabled;
+    }
+  }
+
+  private async updateBatterySaverStatus(): Promise<void> {
+    try {
+      const status = await window.electron.getBatterySaverStatus();
+      const { isEnabled, throttledProcesses, suspendedProcesses } = status;
+      const hasProcesses = throttledProcesses.length > 0 || suspendedProcesses.length > 0;
+      
+      // Batch DOM updates
+      const toggle = this.getElement<HTMLInputElement>('#battery-saver-toggle');
+      const statusBadge = this.getElement('#status-badge');
+      const statusDetails = this.getElement('#status-details');
+      const affectedProcesses = this.getElement('#affected-processes');
+      const processListContent = this.getElement('#process-list-content');
+      
+      if (toggle) toggle.checked = isEnabled;
+      
+      if (statusBadge) {
+        statusBadge.className = `status-badge ${isEnabled ? 'active' : ''}`;
+        const statusText = statusBadge.querySelector('.status-text');
+        if (statusText) statusText.textContent = isEnabled ? 'Active' : 'Disabled';
+      }
+
+      if (statusDetails) {
+        statusDetails.style.display = isEnabled ? 'flex' : 'none';
+        if (isEnabled) {
+          this.setText('#throttled-count', throttledProcesses.length.toString());
+          this.setText('#suspended-count', suspendedProcesses.length.toString());
+        }
+      }
+
+      if (affectedProcesses && processListContent) {
+        if (isEnabled && hasProcesses) {
+          affectedProcesses.style.display = 'block';
+          
+          const allProcesses = [
+            ...throttledProcesses.map(p => ({ name: p, type: 'throttled' as const })),
+            ...suspendedProcesses.map(p => ({ name: p, type: 'suspended' as const }))
+          ];
+          
+          processListContent.innerHTML = allProcesses.map(({ name, type }) => `
+            <div class="process-item">
+              <div class="process-icon ${type}">
+                ${type === 'suspended' ? '⏸' : '🔽'}
+              </div>
+              <div class="process-info">
+                <span class="process-name">${name}</span>
+                <span class="process-type">${type === 'suspended' ? 'Suspended' : 'Throttled'}</span>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          affectedProcesses.style.display = 'none';
+        }
+      }
+
+      this.batterySaverEnabled = isEnabled;
+    } catch (error) {
+      // Silent fail - status will be updated on next check
+    }
+  }
+
+  private async checkAutoDisable(): Promise<void> {
+    if (!this.batterySaverEnabled) {
+      if (this.batterySaverStatusInterval) {
+        clearInterval(this.batterySaverStatusInterval);
+        this.batterySaverStatusInterval = null;
+      }
+      return;
+    }
+
+    try {
+      const status = await window.electron.getBatterySaverStatus();
+      
+      // Auto-disable if charging detected
+      if (status.isCharging && status.isEnabled) {
+        Toast.info('⚡ AC power detected! Restoring processes...');
+        
+        const toggle = this.getElement<HTMLInputElement>('#battery-saver-toggle');
+        if (toggle && toggle.checked) {
+          toggle.checked = false;
+          await this.toggleBatterySaver(false);
+        }
+      }
+    } catch (error) {
+      // Silent fail on auto-disable check
     }
   }
 

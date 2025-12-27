@@ -154,6 +154,14 @@ const electronAPI = {
   setPowerPlan: (guid: string): Promise<{ success: boolean; error?: string }> => 
     ipcRenderer.invoke('set-power-plan', guid),
   
+  // Battery Saver (Deep Sleep Mode)
+  enableBatterySaver: (): Promise<any> => 
+    ipcRenderer.invoke('enable-battery-saver'),
+  disableBatterySaver: (): Promise<any> => 
+    ipcRenderer.invoke('disable-battery-saver'),
+  getBatterySaverStatus: (): Promise<any> => 
+    ipcRenderer.invoke('get-battery-saver-status'),
+  
   // Disk Analysis
   analyzeDisk: (drivePath?: string): Promise<DiskItem | null> => 
     ipcRenderer.invoke('analyze-disk', drivePath),

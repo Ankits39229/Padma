@@ -25,6 +25,11 @@ export interface ElectronAPI {
   getPowerPlans: () => Promise<PowerPlan[]>;
   setPowerPlan: (guid: string) => Promise<{ success: boolean; error?: string }>;
   
+  // Battery Saver (Deep Sleep Mode)
+  enableBatterySaver: () => Promise<BatterySaverResult>;
+  disableBatterySaver: () => Promise<BatterySaverResult>;
+  getBatterySaverStatus: () => Promise<BatterySaverStatus>;
+  
   // Disk Analysis
   analyzeDisk: (drivePath?: string) => Promise<DiskItem | null>;
   getLargestFiles: (drivePath?: string) => Promise<LargeFile[]>;
@@ -121,6 +126,27 @@ export interface PowerPlan {
   guid: string;
   name: string;
   active: boolean;
+}
+
+export interface BatterySaverResult {
+  success: boolean;
+  message?: string;
+  error?: string;
+  processesAffected?: string[];
+  actionsPerformed?: {
+    priorityChanges: number;
+    ecoQoSApplied: number;
+    processesSuspended: number;
+    brightnessReduced: boolean;
+  };
+}
+
+export interface BatterySaverStatus {
+  isEnabled: boolean;
+  batteryPercent: number;
+  isCharging: boolean;
+  suspendedProcesses: string[];
+  throttledProcesses: string[];
 }
 
 export interface BrowserInfo {
