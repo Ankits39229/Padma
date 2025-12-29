@@ -50,7 +50,7 @@
 
 .ring-bg {
   fill: none;
-  stroke: rgba(0, 0, 0, 0.05);
+  stroke: var(--ring-bg);
   stroke-width: 8;
 }
 
@@ -120,19 +120,19 @@
   align-items: center;
   gap: 12px;
   padding: 12px;
-  background: rgba(0, 0, 0, 0.03);
+  background: var(--overlay-hover);
   border: 2px solid transparent;
   border-radius: 12px;
   transition: all 0.2s ease;
 }
 
 .boost-mode-option input:checked + .boost-mode-card {
-  background: rgba(74, 144, 226, 0.1);
+  background: var(--overlay-selected);
   border-color: var(--accent-primary);
 }
 
 .boost-mode-card:hover {
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--overlay-active);
 }
 
 .mode-icon {
@@ -277,7 +277,7 @@
 .battery-body {
   width: 80px;
   height: 36px;
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--overlay-hover);
   border: 3px solid var(--text-muted);
   border-radius: 6px;
   padding: 3px;
@@ -381,7 +381,7 @@
   gap: 16px;
   margin-bottom: 16px;
   padding: 12px;
-  background: rgba(0, 0, 0, 0.02);
+  background: var(--overlay-hover);
   border-radius: 8px;
   border: 1px solid var(--border-subtle);
 }
@@ -445,7 +445,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px;
-  background: rgba(0, 0, 0, 0.02);
+  background: var(--overlay-hover);
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
   cursor: pointer;
@@ -453,7 +453,7 @@
 }
 
 .toggle-label-enhanced:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--overlay-active);
   border-color: var(--accent-primary);
 }
 
@@ -517,7 +517,7 @@
 .process-list {
   margin-top: 16px;
   padding: 12px;
-  background: rgba(0, 0, 0, 0.02);
+  background: var(--overlay-hover);
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
 }
@@ -548,7 +548,7 @@
 }
 
 .btn-icon:hover {
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--overlay-active);
   color: var(--text-primary);
 }
 
@@ -570,7 +570,7 @@
   align-items: center;
   gap: 10px;
   padding: 8px;
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--bg-glass);
   border-radius: 6px;
   font-size: 12px;
 }

@@ -44,6 +44,11 @@ export interface ElectronAPI {
   cleanBrowser: (browserName: string, options: { cache: boolean, cookies: boolean, history: boolean }) => Promise<BrowserCleanResult>;
   closeBrowser: (browserName: string) => Promise<{ success: boolean; error?: string }>;
   
+  // Native Theme Integration
+  getNativeTheme: () => string;
+  setNativeTheme: (mode: 'light' | 'dark' | 'system') => void;
+  onNativeThemeChange: (callback: (isDark: boolean) => void) => void;
+  
   // Event Listeners
   onQuickCleanse: (callback: () => void) => void;
 }

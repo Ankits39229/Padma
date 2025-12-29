@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, nativeTheme } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -148,6 +148,25 @@ ipcMain.on('window-maximize', () => {
   }
 });
 ipcMain.on('window-close', () => mainWindow?.close());
+
+// ============================================================================
+// IPC HANDLERS - Native Theme
+// ============================================================================
+
+ipcMain.on('get-native-theme', (event) => {
+  event.returnValue = nativeTheme.shouldUseDarkColors ? 'dark' : 'light';
+});
+
+ipcMain.on('set-native-theme', (_event, mode: 'light' | 'dark' | 'system') => {
+  nativeTheme.themeSource = mode;
+});
+
+// Listen for native theme changes and notify renderer
+nativeTheme.on('updated', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('native-theme-changed', nativeTheme.shouldUseDarkColors);
+  }
+});
 
 // ============================================================================
 // IPC HANDLERS - System Information

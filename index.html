@@ -3,8 +3,37 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:;">
+  <meta name="theme-color" content="#121212">
   <title>PADMA - System Purifier & Optimizer</title>
+  
+  <!-- Instant Theme Application - Prevents Flash of Wrong Theme -->
+  <script>
+    (function() {
+      try {
+        var stored = localStorage.getItem('padma-appearance');
+        var settings = stored ? JSON.parse(stored) : { theme: 'material-dark', syncWithSystem: false };
+        var theme = settings.theme;
+        
+        if (settings.syncWithSystem && theme !== 'divine') {
+          theme = window.matchMedia('(prefers-color-scheme: dark)').matches 
+            ? 'material-dark' 
+            : 'material-light';
+        }
+        
+        document.documentElement.classList.add('theme-' + theme);
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.dataset.themeMode = theme === 'material-light' ? 'light' : 'dark';
+        
+        // Update meta theme-color
+        var colors = { 'material-light': '#F0F2F5', 'material-dark': '#121212', 'divine': '#0d0d1a' };
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', colors[theme] || '#121212');
+      } catch (e) {
+        document.documentElement.classList.add('theme-material-dark');
+      }
+    })();
+  </script>
   
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">

@@ -184,6 +184,15 @@ const electronAPI = {
   closeBrowser: (browserName: string) => 
     ipcRenderer.invoke('close-browser', browserName),
   
+  // Native Theme Integration
+  getNativeTheme: (): string => 
+    ipcRenderer.sendSync('get-native-theme'),
+  setNativeTheme: (mode: 'light' | 'dark' | 'system'): void => 
+    ipcRenderer.send('set-native-theme', mode),
+  onNativeThemeChange: (callback: (isDark: boolean) => void): void => {
+    ipcRenderer.on('native-theme-changed', (_event, isDark: boolean) => callback(isDark));
+  },
+  
   // Event Listeners
   onQuickCleanse: (callback: () => void): void => {
     ipcRenderer.on('trigger-quick-cleanse', callback);
