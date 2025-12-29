@@ -33,18 +33,18 @@
   height: 200px;
   background: radial-gradient(circle, rgba(186, 230, 253, 0.6) 0%, rgba(224, 242, 254, 0.3) 50%, transparent 70%);
   border-radius: 50%;
-  filter: blur(20px);
-  animation: glowPulse 3s ease-in-out infinite;
+  filter: blur(16px);
+  animation: glowFadeIn 1s ease-out forwards;
 }
 
-@keyframes glowPulse {
-  0%, 100% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 0.8;
+@keyframes glowFadeIn {
+  from { 
+    opacity: 0; 
+    transform: translate(-50%, -50%) scale(0.9); 
   }
-  50% {
-    transform: translate(-50%, -50%) scale(1.1);
-    opacity: 1;
+  to { 
+    opacity: 0.8; 
+    transform: translate(-50%, -50%) scale(1); 
   }
 }
 
@@ -56,29 +56,10 @@
 .lotus-svg {
   width: 240px;
   height: 240px;
-  animation: lotusFloat 4s ease-in-out infinite;
-}
-
-@keyframes lotusFloat {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
 }
 
 .lotus-petal {
-  animation: petalGlow 3s ease-in-out infinite;
-}
-
-@keyframes petalGlow {
-  0%, 100% {
-    opacity: 0.3;
-  }
-  50% {
-    opacity: 0.6;
-  }
+  opacity: 0.4;
 }
 
 .status-text {
@@ -86,8 +67,8 @@
 }
 
 .purity-title {
-  font-size: 16px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 400;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 2px;
@@ -95,8 +76,8 @@
 }
 
 .purity-status {
-  font-size: 42px;
-  font-weight: 700;
+  font-size: 36px;
+  font-weight: 600;
   margin-bottom: 8px;
   transition: color 0.3s ease;
 }
@@ -111,6 +92,10 @@
 
 .purity-status.purity-fair {
   color: var(--accent-warning);
+}
+
+.purity-status.purity-attention {
+  color: #e8a45c; /* Warm amber - calmer than danger red */
 }
 
 .purity-status.purity-critical {
@@ -169,6 +154,11 @@
 
 .summary-card .progress-bar {
   height: 6px;
+}
+
+/* Junk Found Card - Actionable Highlight */
+.summary-card.junk-card {
+  border-left: 3px solid var(--accent-warning);
 }
 
 /* Quick Action Section */

@@ -132,7 +132,7 @@ const electronAPI = {
   cleanJunk: (categories: string[]): Promise<CleanResult> => 
     ipcRenderer.invoke('clean-junk', categories),
   
-  // RAM Optimization (Prana)
+  // RAM Optimization (Optimize)
   boostRam: (): Promise<BoostResult> => 
     ipcRenderer.invoke('boost-ram'),
   boostRamSoft: (): Promise<BoostResult> => 
@@ -176,7 +176,7 @@ const electronAPI = {
   openPath: (filePath: string): Promise<{ success: boolean; error?: string }> => 
     ipcRenderer.invoke('open-path', filePath),
   
-  // Browser Scanner (Drishti)
+  // Browser Scanner (Vision)
   scanBrowsers: () => 
     ipcRenderer.invoke('scan-browsers'),
   cleanBrowser: (browserName: string, options: { cache: boolean, cookies: boolean, history: boolean }) => 

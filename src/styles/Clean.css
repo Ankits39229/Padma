@@ -1,8 +1,8 @@
 /* ============================================================================
-   SHUDDHI (CLEANER) PANEL STYLES
+   Clean (CLEANER) PANEL STYLES
    ============================================================================ */
 
-.shuddhi-content {
+.Clean-content {
   max-width: 1200px;
   margin: 0 auto;
 }
@@ -93,7 +93,7 @@
 }
 
 .category-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
 }
 
 .category-header {

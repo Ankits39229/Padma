@@ -1,11 +1,11 @@
-// Prana Panel - System Optimizer with RAM Boost, Startup Manager, and Battery
+// Optimize Panel - System Optimizer with RAM Boost, Startup Manager, and Battery
 import { BasePanel } from './BasePanel.js';
 import { Toast } from '../components/toast.js';
-import { StartupApp, PowerPlan, SystemInfo } from '../types/electron.d.js';
+import { StartupApp, PowerPlan, SystemInfo } from '../types/electron.js';
 
 type BoostMode = 'soft' | 'hard';
 
-export class PranaPanel extends BasePanel {
+export class OptimizePanel extends BasePanel {
   private startupApps: StartupApp[] = [];
   private powerPlans: PowerPlan[] = [];
   private systemInfo: SystemInfo | null = null;
@@ -17,7 +17,7 @@ export class PranaPanel extends BasePanel {
   private batterySaverStatusInterval: NodeJS.Timeout | null = null;
 
   constructor() {
-    super('prana-panel', 30);
+    super('Optimize-panel', 30);
   }
 
   protected async loadData(): Promise<void> {
@@ -42,7 +42,7 @@ export class PranaPanel extends BasePanel {
     if (!this.container) return;
 
     this.container.innerHTML = `
-      <div class="prana-content">
+      <div class="Optimize-content">
         <!-- Header Section -->
         <div class="panel-header">
           <div class="header-info">
@@ -52,7 +52,7 @@ export class PranaPanel extends BasePanel {
                   <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
                 </svg>
               </span>
-              Prana
+              Optimize
             </h1>
             <p class="panel-subtitle">System Optimizer - Boost performance and manage system resources</p>
           </div>
@@ -523,7 +523,7 @@ export class PranaPanel extends BasePanel {
       radio.addEventListener('change', (e) => {
         const target = e.target as HTMLInputElement;
         this.selectedBoostMode = target.value as BoostMode;
-        console.log('[Prana] Boost mode changed to:', this.selectedBoostMode);
+        console.log('[Optimize] Boost mode changed to:', this.selectedBoostMode);
       });
     });
 
@@ -580,7 +580,7 @@ export class PranaPanel extends BasePanel {
         this.startCooldownTimer(result.remainingSeconds);
       }
     } catch (error) {
-      console.log('[Prana] Cooldown check failed, boost available');
+      console.log('[Optimize] Cooldown check failed, boost available');
     }
   }
 

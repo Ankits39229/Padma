@@ -1,7 +1,7 @@
-// Shuddhi Panel - System Cleaner with categorized junk scanning
+// Clean Panel - System Cleaner with categorized junk scanning
 import { BasePanel } from './BasePanel.js';
 import { Toast } from '../components/toast.js';
-import { JunkScanResult, BrowserInfo } from '../types/electron.d.js';
+import { JunkScanResult, BrowserInfo } from '../types/electron.js';
 
 interface CleaningCategory {
   id: string;
@@ -13,7 +13,7 @@ interface CleaningCategory {
   files: string[];
 }
 
-export class ShuddhiPanel extends BasePanel {
+export class CleanPanel extends BasePanel {
   private categories: CleaningCategory[] = [];
   private browsers: BrowserInfo[] = [];
   private isScanning: boolean = false;
@@ -21,7 +21,7 @@ export class ShuddhiPanel extends BasePanel {
   private totalJunkFound: number = 0;
 
   constructor() {
-    super('shuddhi-panel', 60);
+    super('Clean-panel', 60);
   }
 
   protected init(): void {
@@ -31,7 +31,7 @@ export class ShuddhiPanel extends BasePanel {
   }
 
   private initializeCategories(): void {
-    console.log('[Shuddhi] Initializing categories...');
+    console.log('[Clean] Initializing categories...');
     this.categories = [
       {
         id: 'temp',
@@ -125,8 +125,8 @@ export class ShuddhiPanel extends BasePanel {
         files: []
       }
     ];
-    console.log('[Shuddhi] Categories initialized:', this.categories.length, 'total');
-    console.log('[Shuddhi] Category IDs:', this.categories.map(c => c.id));
+    console.log('[Clean] Categories initialized:', this.categories.length, 'total');
+    console.log('[Clean] Category IDs:', this.categories.map(c => c.id));
   }
 
   protected async loadData(): Promise<void> {
@@ -137,7 +137,7 @@ export class ShuddhiPanel extends BasePanel {
     if (!this.container) return;
 
     this.container.innerHTML = `
-      <div class="shuddhi-content">
+      <div class="Clean-content">
         <!-- Header Section -->
         <div class="panel-header">
           <div class="header-info">
@@ -149,7 +149,7 @@ export class ShuddhiPanel extends BasePanel {
                   <path d="M2 12l10 5 10-5"/>
                 </svg>
               </span>
-              Shuddhi
+              Clean
             </h1>
             <p class="panel-subtitle">System Cleaner - Purify your system by removing junk files</p>
           </div>
@@ -238,7 +238,7 @@ export class ShuddhiPanel extends BasePanel {
   }
 
   private renderCategories(): string {
-    console.log('[Shuddhi] renderCategories called with', this.categories.length, 'categories');
+    console.log('[Clean] renderCategories called with', this.categories.length, 'categories');
     return this.categories.map(cat => `
       <div class="glass-card category-card" data-category="${cat.id}">
         <div class="category-header">
@@ -340,7 +340,7 @@ export class ShuddhiPanel extends BasePanel {
       // Get all category IDs (including dynamic browsers)
       const ALL_CATEGORIES = this.categories.map(c => c.id);
       
-      console.log('[Shuddhi] Starting scan with categories:', ALL_CATEGORIES);
+      console.log('[Clean] Starting scan with categories:', ALL_CATEGORIES);
       let scanned = 0;
       
       // Store all results
@@ -356,13 +356,13 @@ export class ShuddhiPanel extends BasePanel {
           progressText.textContent = `Scanning ${cat?.name || catId}...`;
         }
 
-        console.log(`[Shuddhi] Scanning category: ${catId}`);
+        console.log(`[Clean] Scanning category: ${catId}`);
         const result = await window.electron.scanJunk([catId]);
-        console.log(`[Shuddhi] Result for ${catId}:`, result);
+        console.log(`[Clean] Result for ${catId}:`, result);
         
         if (result[catId]) {
           scanResults[catId] = result[catId];
-          console.log(`[Shuddhi] Stored result for ${catId}: ${this.formatBytes(result[catId].size)}`);
+          console.log(`[Clean] Stored result for ${catId}: ${this.formatBytes(result[catId].size)}`);
         }
 
         scanned++;
@@ -385,7 +385,7 @@ export class ShuddhiPanel extends BasePanel {
       });
 
       this.totalJunkFound = totalSize;
-      console.log(`[Shuddhi] Total junk found: ${this.formatBytes(this.totalJunkFound)}`);
+      console.log(`[Clean] Total junk found: ${this.formatBytes(this.totalJunkFound)}`);
       
       // Update UI using ALL_CATEGORIES
       for (const catId of ALL_CATEGORIES) {
@@ -394,9 +394,9 @@ export class ShuddhiPanel extends BasePanel {
         const element = this.getElement(`#size-${catId}`);
         if (element) {
           element.textContent = sizeText;
-          console.log(`[Shuddhi] Updated UI for ${catId}: ${sizeText}`);
+          console.log(`[Clean] Updated UI for ${catId}: ${sizeText}`);
         } else {
-          console.log(`[Shuddhi] WARNING: Element #size-${catId} not found in DOM!`);
+          console.log(`[Clean] WARNING: Element #size-${catId} not found in DOM!`);
         }
       }
 
@@ -407,7 +407,7 @@ export class ShuddhiPanel extends BasePanel {
         const totalJunkElement = this.getElement('#total-junk');
         if (totalJunkElement) {
           totalJunkElement.textContent = this.formatBytes(this.totalJunkFound);
-          console.log(`[Shuddhi] Updated total display: ${this.formatBytes(this.totalJunkFound)}`);
+          console.log(`[Clean] Updated total display: ${this.formatBytes(this.totalJunkFound)}`);
         }
       }
 

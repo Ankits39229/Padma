@@ -115,7 +115,7 @@ export class DashboardPanel extends BasePanel {
           </div>
 
           <!-- Junk Found Card -->
-          <div class="glass-card summary-card">
+          <div class="glass-card summary-card junk-card">
             <div class="card-icon junk-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M3 6h18"/>
@@ -271,27 +271,27 @@ export class DashboardPanel extends BasePanel {
 
     if (overallScore >= 70) {
       return { 
-        status: 'Excellent', 
+        status: 'Pure', 
         level: 'excellent', 
-        message: 'Your system is running at peak performance' 
+        message: 'Your system is running smoothly' 
       };
     } else if (overallScore >= 50) {
       return { 
-        status: 'Good', 
+        status: 'Balanced', 
         level: 'good', 
-        message: 'Your system is healthy with minor optimization opportunities' 
+        message: 'Your system is healthy' 
       };
     } else if (overallScore >= 30) {
       return { 
-        status: 'Fair', 
+        status: 'Could Be Lighter', 
         level: 'fair', 
-        message: 'Consider running a cleanse to improve performance' 
+        message: 'A quick cleanse can help' 
       };
     } else {
       return { 
-        status: 'Needs Attention', 
-        level: 'critical', 
-        message: 'Your system would benefit from optimization' 
+        status: 'Room to Improve', 
+        level: 'attention', 
+        message: 'Consider running a cleanse when convenient' 
       };
     }
   }

@@ -1,12 +1,13 @@
 // Renderer Process - Main Entry Point
 import { TitleBar } from './components/titlebar.js';
 import { Sidebar } from './components/sidebar.js';
+import { themeManager } from './utils/theme.js';
 
 // Import panels
 import { DashboardPanel } from './panels/dashboard.js';
-import { ShuddhiPanel } from './panels/shuddhi.js';
-import { PranaPanel } from './panels/prana.js';
-import { DrishtiPanel } from './panels/drishti.js';
+import { CleanPanel } from './panels/Clean.js';
+import { OptimizePanel } from './panels/Optimize.js';
+import { VisionPanel } from './panels/Vision.js';
 import { SettingsPanel } from './panels/settings.js';
 
 // ============================================================================
@@ -19,7 +20,15 @@ class PadmaApp {
   private panels: Map<string, any> = new Map();
 
   constructor() {
+    // Initialize theme immediately to prevent flash
+    this.initTheme();
     this.init();
+  }
+
+  private initTheme(): void {
+    // Theme manager initializes itself and applies theme on construction
+    // This ensures theme is applied before DOM renders
+    console.log('🎨 Theme initialized:', themeManager.getCurrentTheme());
   }
 
   private init(): void {
@@ -47,19 +56,19 @@ class PadmaApp {
   private initializePanels(): void {
     // Initialize all panels
     this.panels.set('dashboard', new DashboardPanel());
-    this.panels.set('shuddhi', new ShuddhiPanel());
-    this.panels.set('prana', new PranaPanel());
-    this.panels.set('drishti', new DrishtiPanel());
+    this.panels.set('Clean', new CleanPanel());
+    this.panels.set('Optimize', new OptimizePanel());
+    this.panels.set('Vision', new VisionPanel());
     this.panels.set('settings', new SettingsPanel());
   }
 
   private setupEventListeners(): void {
     // Listen for quick cleanse trigger from tray
     window.electron.onQuickCleanse(() => {
-      this.sidebar?.switchToPanel('shuddhi');
-      const shuddhiPanel = this.panels.get('shuddhi') as ShuddhiPanel;
-      if (shuddhiPanel) {
-        shuddhiPanel.triggerQuickScan();
+      this.sidebar?.switchToPanel('Clean');
+      const CleanPanel = this.panels.get('Clean') as CleanPanel;
+      if (CleanPanel) {
+        CleanPanel.triggerQuickScan();
       }
     });
   }

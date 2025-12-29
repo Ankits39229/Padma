@@ -11,7 +11,7 @@ export interface ElectronAPI {
   scanJunk: (categories: string[]) => Promise<JunkScanResult>;
   cleanJunk: (categories: string[]) => Promise<CleanResult>;
   
-  // RAM Optimization (Prana)
+  // RAM Optimization (Optimize)
   boostRam: () => Promise<BoostResult>;
   boostRamSoft: () => Promise<BoostResult>;
   boostRamHard: () => Promise<BoostResult>;
@@ -39,7 +39,7 @@ export interface ElectronAPI {
   generateSystemReport: () => Promise<SystemReport>;
   openPath: (filePath: string) => Promise<{ success: boolean; error?: string }>;
   
-  // Browser Scanner (Drishti)
+  // Browser Scanner (Vision)
   scanBrowsers: () => Promise<BrowserScanResult>;
   cleanBrowser: (browserName: string, options: { cache: boolean, cookies: boolean, history: boolean }) => Promise<BrowserCleanResult>;
   closeBrowser: (browserName: string) => Promise<{ success: boolean; error?: string }>;

@@ -1,104 +1,21 @@
 /* ============================================================================
-   DRISHTI (ANALYZER) PANEL STYLES
+   Vision (ANALYZER) PANEL STYLES
    ============================================================================ */
 
-.drishti-content {
+.Vision-content {
   max-width: 1200px;
   margin: 0 auto;
 }
 
 /* Analysis Grid */
 .analysis-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
+  display: flex;
   margin-bottom: 32px;
 }
 
 .analysis-card {
-  min-height: 360px;
-}
-
-/* Disk Visualization */
-.disk-viz-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 280px;
-}
-
-.disk-viz-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  color: var(--text-muted);
-}
-
-.placeholder-icon {
-  width: 64px;
-  height: 64px;
-  opacity: 0.3;
-}
-
-.sunburst-chart {
   width: 100%;
-  max-width: 280px;
-}
-
-.sunburst-segment {
-  cursor: pointer;
-  transition: opacity 0.2s ease;
-}
-
-.sunburst-segment:hover {
-  opacity: 0.8;
-}
-
-.sunburst-center-text {
-  font-size: 12px;
-  fill: var(--text-muted);
-}
-
-.sunburst-center-value {
-  font-size: 14px;
-  font-weight: 700;
-  fill: var(--text-primary);
-}
-
-.disk-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: 16px;
-  border-top: 1px solid var(--border-subtle);
-  margin-top: 16px;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-}
-
-.legend-color {
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
-}
-
-.legend-name {
-  color: var(--text-secondary);
-  max-width: 100px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.legend-size {
-  font-weight: 600;
-  color: var(--text-primary);
+  min-height: 360px;
 }
 
 /* Health List */

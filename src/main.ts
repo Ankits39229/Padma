@@ -625,7 +625,7 @@ async function deleteFilesInDirectory(dirPath: string): Promise<number> {
 // ============================================================================
 
 // ============================================================================
-// IPC HANDLERS - RAM Optimization (Prana)
+// IPC HANDLERS - RAM Optimization (Optimize)
 // ============================================================================
 
 // System critical processes that should never be touched
@@ -1549,7 +1549,7 @@ ipcMain.handle('open-path', async (_, filePath: string) => {
 });
 
 // ============================================================================
-// BROWSER SCANNER - DRISHTI MODULE
+// BROWSER SCANNER - Vision MODULE
 // ============================================================================
 
 interface BrowserInfo {

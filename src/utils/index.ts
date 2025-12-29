@@ -1,3 +1,4 @@
 // Utility exports
-export * from './dom';
-export * from './formatting';
+export * from './dom.js';
+export * from './formatting.js';
+export * from './theme.js';
