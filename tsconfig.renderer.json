@@ -1,7 +1,0 @@
-{
-  "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "module": "ES2020"
-  },
-  "include": ["src/renderer.ts", "src/components/**/*", "src/panels/**/*", "src/utils/**/*", "src/types/**/*"]
-}

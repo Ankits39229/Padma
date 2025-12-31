@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Rose Theme (Default) */
+:root,
+.theme-rose {
+  --primary: #be123c;
+  --primary-light: #fecdd3;
+  --primary-lighter: #fff1f2;
+  --primary-dark: #9f1239;
+  --accent: #e11d48;
+  --background: #fafafa;
+  --background-secondary: #ffffff;
+  --foreground: #1e293b;
+  --foreground-muted: #64748b;
+  --foreground-light: #94a3b8;
+  --border: #e2e8f0;
+  --border-light: #f1f5f9;
+  --card: #ffffff;
+  --card-hover: #f8fafc;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --sidebar-bg: #ffffff;
+  --titlebar-bg: #ffffff;
+}
+
+/* Material Light Theme - Soft Lavender */
+.theme-material-light {
+  --primary: #1e1b4b;
+  --primary-light: #e0e0f0;
+  --primary-lighter: #f0f0f8;
+  --primary-dark: #0f0a2e;
+  --accent: #6366f1;
+  --background: #f5f3ff;
+  --background-secondary: #ffffff;
+  --foreground: #1e1b4b;
+  --foreground-muted: #64748b;
+  --foreground-light: #94a3b8;
+  --border: #e2e0f0;
+  --border-light: #f0eef8;
+  --card: #ffffff;
+  --card-hover: #faf8ff;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --sidebar-bg: #ffffff;
+  --titlebar-bg: #ffffff;
+}
+
+/* Material Dark Theme - Pure Black */
+.theme-material-dark {
+  --primary: #4fc3f7;
+  --primary-light: #1e3a4a;
+  --primary-lighter: #0d1a20;
+  --primary-dark: #81d4fa;
+  --accent: #00bcd4;
+  --background: #000000;
+  --background-secondary: #0a0a0a;
+  --foreground: #ffffff;
+  --foreground-muted: #b0bec5;
+  --foreground-light: #78909c;
+  --border: #1a1a1a;
+  --border-light: #121212;
+  --card: #0a0a0a;
+  --card-hover: #141414;
+  --success: #69f0ae;
+  --warning: #ffca28;
+  --danger: #ff5252;
+  --sidebar-bg: #0a0a0a;
+  --titlebar-bg: #000000;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  
+  html, body, #root {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+  
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+}
